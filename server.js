@@ -7,7 +7,7 @@ app.use(express.json());
 
 // Маршрут по умолчанию
 app.get('/', (req, res) => {
-    res.send('Привет, мир!');
+    res.send('Привет sdaddas , мир!');
 });
 
 // Запуск сервера
