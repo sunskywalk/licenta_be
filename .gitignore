@@ -1,0 +1,74 @@
+# Node.js modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Editor config
+.idea/
+.vscode/
+*.swp
+
+# Dependency directories
+bower_components/
+jspm_packages/
+
+# Build output
+dist/
+build/
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+*.pid
+*.seed
+*.pid.lock
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Package locks (optional, prefer keeping them in repo)
+# package-lock.json
+# yarn.lock
+
+# Test coverage output
+.nyc_output/
+coverage/
+
+# PM2 or similar process manager files
+pm2.pid
+
+# Debug logs from npm
+npm-debug.log
+yarn-debug.log
+pnpm-debug.log
+
+# Optional NPM cache
+.npm/
+
+# Docker files
+docker-compose.override.yml
+.docker/
+
+# Secrets
+*.key
+*.pem
+
+# Other
+*.bak
+*.old
