@@ -11,9 +11,8 @@ router.get('/:id', protect, gradeController.getGradeById);
 router.put('/:id', protect, gradeController.updateGrade);
 router.delete('/:id', protect, gradeController.deleteGrade);
 
-// Получение средней
+// Методы для расчётов
 router.get('/student/:studentId/average', protect, gradeController.getStudentAverage);
-// Получение итоговой
 router.get('/student/:studentId/final', protect, gradeController.getFinalAverage);
 
 module.exports = router;

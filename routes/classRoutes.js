@@ -4,15 +4,19 @@ const router = express.Router();
 const classController = require('../controllers/classController');
 const { protect } = require('../middleware/authMiddleware');
 
-// Создать класс
+// Создать класс (admin)
 router.post('/', protect, classController.createClass);
+
 // Получить все
 router.get('/', protect, classController.getAllClasses);
-// Получить по ID
+
+// Получить 1
 router.get('/:id', protect, classController.getClassById);
-// Обновить
+
+// Обновить (admin)
 router.put('/:id', protect, classController.updateClass);
-// Удалить
+
+// Удалить (admin)
 router.delete('/:id', protect, classController.deleteClass);
 
 module.exports = router;

@@ -4,17 +4,16 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 
+// Логин - публично
+router.post('/login', userController.loginUser);
+
 // Регистрация (admin)
 router.post('/register', protect, userController.registerUser);
 
-router.post('/test-register', userController.registerUser); // без protect
-// Логин (публичный)
-router.post('/login', userController.loginUser);
-
-// Получить всех пользователей (admin)
+// Список пользователей (admin)
 router.get('/', protect, userController.getAllUsers);
 
-// Получить одного
+// Получить 1
 router.get('/:id', protect, userController.getUserById);
 
 // Обновить

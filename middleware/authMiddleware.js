@@ -4,7 +4,9 @@ const jwt = require('jsonwebtoken');
 // Проверка JWT
 exports.protect = (req, res, next) => {
   let token = null;
-
+  console.log('=== PROTECT ===');
+  console.log('TOKEN:', token);
+  console.log('DECODED:', decoded);
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
@@ -34,4 +36,5 @@ exports.checkRole = (roles) => {
     }
     next();
   };
+  
 };

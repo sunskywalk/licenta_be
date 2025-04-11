@@ -4,25 +4,24 @@ const Classroom = require('../models/Classroom');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 
-// ======================
-// Регистрация пользователя (только admin)
-// ======================
+// ========================
+// 1. Регистрация (admin)
+// ========================
 exports.registerUser = async (req, res) => {
   try {
     const { name, email, password, role, classRooms } = req.body;
 
-    // Проверка: только admin может создавать новых пользователей
-    //if (req.user.role !== 'admin') {
-    //  return res.status(403).json({ message: 'Только админ может создавать пользователей' });
-   // }
+    // Проверяем - только admin может создавать
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Только admin может создавать пользователей' });
+    }
 
-    // Проверяем, существует ли пользователь с таким e-mail
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    // Проверим email
+    const existing = await User.findOne({ email });
+    if (existing) {
       return res.status(400).json({ message: 'Пользователь с таким email уже существует' });
     }
 
-    // Создаем пользователя
     const newUser = await User.create({
       name,
       email,
@@ -31,23 +30,23 @@ exports.registerUser = async (req, res) => {
       classRooms: classRooms || [],
     });
 
-    // Если нужно, добавляем пользователя в массив студентов/учителей соответствующих классов
+    // Добавим этого пользователя в classrooms (учителя в teachers, ученика в students)
     if (classRooms && Array.isArray(classRooms)) {
       for (let clsId of classRooms) {
-        const classroom = await Classroom.findById(clsId);
-        if (classroom) {
-          if (role === 'student') {
-            classroom.students.push(newUser._id);
-          } else if (role === 'teacher') {
-            classroom.teachers.push(newUser._id);
+        const cls = await Classroom.findById(clsId);
+        if (cls) {
+          if (role === 'teacher') {
+            cls.teachers.push(newUser._id);
+          } else if (role === 'student') {
+            cls.students.push(newUser._id);
           }
-          await classroom.save();
+          await cls.save();
         }
       }
     }
 
     res.status(201).json({
-      message: 'Пользователь успешно зарегистрирован',
+      message: 'Пользователь создан',
       user: {
         _id: newUser._id,
         name: newUser.name,
@@ -57,24 +56,20 @@ exports.registerUser = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при регистрации', error: error.message });
+    res.status(500).json({ message: 'Ошибка при создании пользователя', error: error.message });
   }
 };
 
-// ======================
-// Логин
-// ======================
+// ========================
+// 2. Логин
+// ========================
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Ищем пользователя
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate('classRooms');
     if (!user) {
       return res.status(400).json({ message: 'Неверный email или пароль' });
     }
-
-    // Проверяем пароль
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Неверный email или пароль' });
@@ -82,16 +77,13 @@ exports.loginUser = async (req, res) => {
 
     // Генерируем токен
     const token = jwt.sign(
-      {
-        userId: user._id,
-        role: user.role,
-      },
+      { userId: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
 
     res.json({
-      message: 'Успешный вход в систему',
+      message: 'Успешный вход',
       token,
       user: {
         _id: user._id,
@@ -106,14 +98,13 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// ======================
-// Список пользователей (admin)
-// ======================
+// ========================
+// 3. Список всех пользователей (admin)
+// ========================
 exports.getAllUsers = async (req, res) => {
   try {
-    // Только админ
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Только админ может смотреть всех пользователей' });
+      return res.status(403).json({ message: 'Нет прав' });
     }
     const users = await User.find().select('-password').populate('classRooms');
     res.json(users);
@@ -122,40 +113,37 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// ======================
-// Получить конкретного пользователя
-// ======================
+// ========================
+// 4. Получить 1 пользователя
+// ========================
 exports.getUserById = async (req, res) => {
   try {
-    // любой авторизованный может получить, но чаще — только админ или сам пользователь
+    // admin или сам пользователь
     const userId = req.params.id;
-
     if (req.user.role !== 'admin' && req.user.userId !== userId) {
-      return res.status(403).json({ message: 'Нет доступа к этому профилю' });
+      return res.status(403).json({ message: 'Нет прав' });
     }
-
     const user = await User.findById(userId).select('-password').populate('classRooms');
     if (!user) {
-      return res.status(404).json({ message: 'Пользователь не найден' });
+      return res.status(404).json({ message: 'Не найден' });
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при получении пользователя', error: error.message });
+    res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
 
-// ======================
-// Обновить пользователя (admin или сам пользователь)
-// ======================
+// ========================
+// 5. Обновить пользователя
+// ========================
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
     const { name, email, password, role, classRooms } = req.body;
-
-    // Проверка прав: админ может менять кого угодно, 
-    // пользователь — только себя (но без изменения роли)
+    
+    // admin может менять любого, пользователь - только себя (без смены роли)
     if (req.user.role !== 'admin' && req.user.userId !== userId) {
-      return res.status(403).json({ message: 'Недостаточно прав' });
+      return res.status(403).json({ message: 'Нет прав' });
     }
 
     const user = await User.findById(userId);
@@ -163,30 +151,49 @@ exports.updateUser = async (req, res) => {
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
 
-    // Обновляем поля
     if (name) user.name = name;
     if (email) user.email = email;
-    // Пароль меняем отдельно
     if (password) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
     }
-    // Роль может менять только админ
+    // Роль меняет только admin
     if (role && req.user.role === 'admin') {
       user.role = role;
     }
 
-    // При желании обновляем классы (только админ)
+    // classRooms - тоже только admin
     if (classRooms && req.user.role === 'admin') {
-      // Удалим пользователя из старых классов
-      // (если старая логика требует)
-      // затем добавим в новые классы:
+      // Удалим пользователя из прежних классов
+      // И добавим в новые
+      // Здесь простая реализация: заново переприсваиваем
+      // 1) Найдём все классы, где он был teacher/students, уберём
+      const allOldClasses = await Classroom.find({
+        $or: [
+          { teachers: userId },
+          { students: userId },
+        ],
+      });
+      for (const c of allOldClasses) {
+        c.teachers = c.teachers.filter(t => t.toString() !== userId);
+        c.students = c.students.filter(s => s.toString() !== userId);
+        await c.save();
+      }
+
+      // 2) Добавим к новым
+      for (const clsId of classRooms) {
+        const cls = await Classroom.findById(clsId);
+        if (cls) {
+          if (user.role === 'teacher') {
+            cls.teachers.push(user._id);
+          } else if (user.role === 'student') {
+            cls.students.push(user._id);
+          }
+          await cls.save();
+        }
+      }
+
       user.classRooms = classRooms;
-      // Можно сделать дополнительную логику для Classroom:
-      // 1) Вычистить из старых classroom (teachers/students) — 
-      // 2) Добавить в новые...
-      // Ниже — упрощённая схема, когда мы только добавляем/обновляем.
-      // Для полноты лучше писать отдельную бизнес-логику.
     }
 
     await user.save();
@@ -196,33 +203,32 @@ exports.updateUser = async (req, res) => {
       user: await User.findById(userId).select('-password').populate('classRooms'),
     });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при обновлении пользователя', error: error.message });
+    res.status(500).json({ message: 'Ошибка при обновлении', error: error.message });
   }
 };
 
-// ======================
-// Удалить пользователя (admin)
-// ======================
+// ========================
+// 6. Удалить пользователя
+// ========================
 exports.deleteUser = async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Только админ может удалять пользователей' });
+      return res.status(403).json({ message: 'Нет прав (только admin)' });
     }
-
     const userId = req.params.id;
     const userToDelete = await User.findById(userId);
     if (!userToDelete) {
       return res.status(404).json({ message: 'Пользователь не найден' });
     }
 
-    // Удаляем ссылку из Classroom
-    const allClassrooms = await Classroom.find({ 
+    // Удалим ссылки из классов
+    const classes = await Classroom.find({
       $or: [
         { teachers: userId },
-        { students: userId }
-      ]
+        { students: userId },
+      ],
     });
-    for (let cls of allClassrooms) {
+    for (let cls of classes) {
       cls.teachers = cls.teachers.filter(t => t.toString() !== userId);
       cls.students = cls.students.filter(s => s.toString() !== userId);
       await cls.save();
@@ -232,6 +238,6 @@ exports.deleteUser = async (req, res) => {
 
     res.json({ message: 'Пользователь удалён', userId });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при удалении пользователя', error: error.message });
+    res.status(500).json({ message: 'Ошибка при удалении', error: error.message });
   }
 };

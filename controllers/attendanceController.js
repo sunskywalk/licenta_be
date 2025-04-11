@@ -3,95 +3,80 @@ const Attendance = require('../models/Attendance');
 
 exports.createAttendance = async (req, res) => {
   try {
-    // Обычно teacher / admin отмечает посещаемость
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Нет прав для отметки посещаемости' });
+      return res.status(403).json({ message: 'Нет прав отмечать посещаемость' });
     }
-
     const { student, subject, status } = req.body;
-    const attendance = await Attendance.create({ student, subject, status });
-    res.status(201).json({
-      message: 'Запись о посещаемости создана',
-      attendance,
-    });
+    const record = await Attendance.create({ student, subject, status });
+    res.status(201).json({ message: 'Посещаемость отмечена', attendance: record });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при создании записи посещаемости', error: error.message });
+    res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
 
 exports.getAllAttendance = async (req, res) => {
   try {
-    // Любой авторизованный, но student видит только свои
+    // если student - только свои записи
     if (req.user.role === 'student') {
-      const records = await Attendance.find({ student: req.user.userId }).populate('student', '-password');
+      const records = await Attendance.find({ student: req.user.userId })
+        .populate('student', '-password');
       return res.json(records);
     } else {
+      // teacher/admin - все
       const records = await Attendance.find().populate('student', '-password');
       return res.json(records);
     }
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при получении записей посещаемости', error: error.message });
+    res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
 
 exports.getAttendanceById = async (req, res) => {
   try {
-    const attendance = await Attendance.findById(req.params.id).populate('student', '-password');
-    if (!attendance) {
-      return res.status(404).json({ message: 'Запись не найдена' });
+    const record = await Attendance.findById(req.params.id).populate('student', '-password');
+    if (!record) {
+      return res.status(404).json({ message: 'Не найдено' });
     }
-
-    // Если студент, то только свои записи
-    if (req.user.role === 'student' && attendance.student._id.toString() !== req.user.userId) {
-      return res.status(403).json({ message: 'Нет доступа' });
+    if (req.user.role === 'student' && record.student._id.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Нет прав' });
     }
-
-    res.json(attendance);
+    res.json(record);
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при получении записи посещаемости', error: error.message });
+    res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
 
 exports.updateAttendance = async (req, res) => {
   try {
-    // teacher / admin
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Нет прав для обновления посещаемости' });
+      return res.status(403).json({ message: 'Нет прав' });
     }
-
     const { student, subject, status } = req.body;
     const updated = await Attendance.findByIdAndUpdate(
       req.params.id,
       { student, subject, status },
       { new: true }
     ).populate('student', '-password');
-
     if (!updated) {
-      return res.status(404).json({ message: 'Запись не найдена' });
+      return res.status(404).json({ message: 'Не найдено' });
     }
-
-    res.json({
-      message: 'Запись о посещаемости обновлена',
-      attendance: updated,
-    });
+    res.json({ message: 'Посещаемость обновлена', attendance: updated });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при обновлении записи посещаемости', error: error.message });
+    res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
 
 exports.deleteAttendance = async (req, res) => {
   try {
-    // teacher / admin
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Нет прав для удаления записей посещаемости' });
+      return res.status(403).json({ message: 'Нет прав' });
     }
-
     const deleted = await Attendance.findByIdAndDelete(req.params.id);
     if (!deleted) {
-      return res.status(404).json({ message: 'Запись не найдена' });
+      return res.status(404).json({ message: 'Не найдено' });
     }
-    res.json({ message: 'Запись о посещаемости удалена' });
+    res.json({ message: 'Запись удалена' });
   } catch (error) {
-    res.status(500).json({ message: 'Ошибка при удалении записи посещаемости', error: error.message });
+    res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
