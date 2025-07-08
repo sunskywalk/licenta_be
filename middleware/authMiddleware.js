@@ -54,3 +54,14 @@ exports.checkRole = (allowedRoles = []) => (req, res, next) => {
   }
   return next();
 };
+
+/**
+ * Middleware только для админов.
+ * Пример: router.get('/stats', protect, adminOnly, statsController);
+ */
+exports.adminOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Доступ только для администраторов' });
+  }
+  return next();
+};
