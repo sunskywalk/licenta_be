@@ -7,13 +7,16 @@ exports.createGrade = async (req, res) => {
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав добавлять оценки' });
     }
-    const { student, subject, type, semester, value } = req.body;
+    const { student, subject, type, semester, value, classId, comment } = req.body;
     const newGrade = await Grade.create({
       student,
+      teacher: req.user.userId,
+      classId,
       subject,
       type,
       semester,
       value,
+      comment,
     });
     res.status(201).json({ message: 'Оценка создана', grade: newGrade });
   } catch (error) {
@@ -23,9 +26,10 @@ exports.createGrade = async (req, res) => {
 
 exports.getAllGrades = async (req, res) => {
   try {
-    // Любой авторизованный, но student увидит только свои? Можно сделать фильтр
-    // Для простоты — возвращаем все
-    const grades = await Grade.find().populate('student', '-password');
+    const grades = await Grade.find()
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
     res.json(grades);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -34,7 +38,10 @@ exports.getAllGrades = async (req, res) => {
 
 exports.getGradeById = async (req, res) => {
   try {
-    const grade = await Grade.findById(req.params.id).populate('student', '-password');
+    const grade = await Grade.findById(req.params.id)
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
     if (!grade) {
       return res.status(404).json({ message: 'Оценка не найдена' });
     }
@@ -49,12 +56,14 @@ exports.updateGrade = async (req, res) => {
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав' });
     }
-    const { student, subject, type, semester, value } = req.body;
+    const { student, subject, type, semester, value, classId, comment } = req.body;
     const updated = await Grade.findByIdAndUpdate(
       req.params.id,
-      { student, subject, type, semester, value },
+      { student, teacher: req.user.userId, classId, subject, type, semester, value, comment },
       { new: true }
-    ).populate('student', '-password');
+    ).populate('student', '-password')
+     .populate('teacher', '-password')
+     .populate('classId');
     if (!updated) {
       return res.status(404).json({ message: 'Не найдено' });
     }
@@ -87,7 +96,7 @@ exports.getStudentAverage = async (req, res) => {
   try {
     const { studentId } = req.params;
     // если student, смотрит только свою
-    if (req.user.role === 'student' && req.user.userId !== studentId) {
+    if (req.user.role === 'student' && String(req.user.userId) !== String(studentId)) {
       return res.status(403).json({ message: 'Нет прав' });
     }
     const { subject, semester } = req.query;
@@ -95,7 +104,10 @@ exports.getStudentAverage = async (req, res) => {
     if (subject) filter.subject = subject;
     if (semester) filter.semester = Number(semester);
 
-    const grades = await Grade.find(filter);
+    const grades = await Grade.find(filter)
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
     if (!grades.length) {
       return res.json({ average: 0, count: 0 });
     }
@@ -113,14 +125,17 @@ exports.getStudentAverage = async (req, res) => {
 exports.getFinalAverage = async (req, res) => {
   try {
     const { studentId } = req.params;
-    if (req.user.role === 'student' && req.user.userId !== studentId) {
+    if (req.user.role === 'student' && String(req.user.userId) !== String(studentId)) {
       return res.status(403).json({ message: 'Нет прав' });
     }
     const { subject } = req.query;
     let filter = { student: studentId };
     if (subject) filter.subject = subject;
 
-    const allGrades = await Grade.find(filter);
+    const allGrades = await Grade.find(filter)
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
     const sem1 = allGrades.filter(g => g.semester === 1);
     const sem2 = allGrades.filter(g => g.semester === 2);
 
@@ -135,6 +150,139 @@ exports.getFinalAverage = async (req, res) => {
       finalAverage: finalAvg.toFixed(2),
     });
   } catch (error) {
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// ============================
+// Получение оценок учителя
+// ============================
+exports.getTeacherGrades = async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    console.log('[getTeacherGrades] teacherId:', teacherId, 'user:', req.user.userId, 'role:', req.user.role);
+    
+    // Админы могут смотреть оценки любого учителя
+    if (req.user.role === 'admin') {
+      console.log('[getTeacherGrades] Admin access granted');
+    } else if (req.user.role === 'teacher') {
+      if (String(req.user.userId) !== String(teacherId)) {
+        console.log('[getTeacherGrades] Access denied - teacher trying to access another teacher\'s grades');
+        return res.status(403).json({ message: 'Нет прав - учитель может смотреть только свои оценки' });
+      }
+      console.log('[getTeacherGrades] Teacher access granted - own grades');
+    } else {
+      console.log('[getTeacherGrades] Access denied - invalid role:', req.user.role);
+      return res.status(403).json({ message: 'Нет прав - недопустимая роль' });
+    }
+    
+    const grades = await Grade.find({ teacher: teacherId })
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
+      
+    console.log('[getTeacherGrades] Found grades count:', grades.length);
+    res.json(grades);
+  } catch (error) {
+    console.error('Error in getTeacherGrades:', error);
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// ============================
+// Получение оценок студента
+// ============================
+exports.getStudentGrades = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    // Студент может смотреть только свои оценки
+    if (req.user.role === 'student' && String(req.user.userId) !== String(studentId)) {
+      return res.status(403).json({ message: 'Нет прав' });
+    }
+    
+    const grades = await Grade.find({ student: studentId })
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
+    res.json(grades);
+  } catch (error) {
+    console.error('Error in getStudentGrades:', error);
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// ============================
+// Получение оценок по классу
+// ============================
+exports.getGradesByClass = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    
+    const grades = await Grade.find({ classId })
+      .populate('student', '-password')
+      .populate('teacher', '-password')
+      .populate('classId');
+    res.json(grades);
+  } catch (error) {
+    console.error('Error in getGradesByClass:', error);
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// ============================
+// Получение предметов учителя
+// ============================
+exports.getTeacherSubjects = async (req, res) => {
+  try {
+    const teacherId = req.user.userId;
+    console.log('[getTeacherSubjects] teacherId:', teacherId);
+    
+    // Получаем все уникальные предметы учителя
+    const subjects = await Grade.distinct('subject', { teacher: teacherId });
+    console.log('[getTeacherSubjects] Found subjects:', subjects);
+    
+    // Для каждого предмета считаем количество оценок
+    const subjectsWithCounts = await Promise.all(
+      subjects.map(async (subject) => {
+        const count = await Grade.countDocuments({ teacher: teacherId, subject });
+        return { subject, gradeCount: count };
+      })
+    );
+    
+    res.json(subjectsWithCounts);
+  } catch (error) {
+    console.error('Error in getTeacherSubjects:', error);
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// ============================
+// Получение классов по предмету
+// ============================
+exports.getClassroomsForSubject = async (req, res) => {
+  try {
+    const { subject } = req.params;
+    const teacherId = req.user.userId;
+    console.log('[getClassroomsForSubject] subject:', subject, 'teacherId:', teacherId);
+    
+    // Получаем все классы где учитель ведет данный предмет
+    const classIds = await Grade.distinct('classId', { 
+      teacher: teacherId, 
+      subject: subject 
+    });
+    console.log('[getClassroomsForSubject] Found classIds:', classIds);
+    
+    // Получаем информацию о классах с populate студентов
+    const Classroom = require('../models/Classroom');
+    const classrooms = await Classroom.find({ _id: { $in: classIds } })
+      .populate('students', '-password')
+      .populate('teachers', '-password');
+    console.log('[getClassroomsForSubject] Found classrooms:', classrooms.map(c => `${c.name} (${c.students?.length || 0} students)`));
+    
+    res.json(classrooms);
+  } catch (error) {
+    console.error('Error in getClassroomsForSubject:', error);
     res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };

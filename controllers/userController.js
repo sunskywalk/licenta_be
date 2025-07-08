@@ -12,7 +12,7 @@ exports.registerUser = async (req, res) => {
     const { name, email, password, role, classRooms } = req.body;
 
     // Проверяем - только admin может создавать
-    if (req.user.role !== 'admin') {
+    if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Только admin может создавать пользователей' });
     }
 
@@ -103,7 +103,7 @@ exports.loginUser = async (req, res) => {
 // ========================
 exports.getAllUsers = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав' });
     }
     const users = await User.find().select('-password').populate('classRooms');
@@ -120,7 +120,7 @@ exports.getUserById = async (req, res) => {
   try {
     // admin или сам пользователь
     const userId = req.params.id;
-    if (req.user.role !== 'admin' && req.user.userId !== userId) {
+    if (!req.user || (req.user.role !== 'admin' && req.user.userId !== userId)) {
       return res.status(403).json({ message: 'Нет прав' });
     }
     const user = await User.findById(userId).select('-password').populate('classRooms');
@@ -142,7 +142,7 @@ exports.updateUser = async (req, res) => {
     const { name, email, password, role, classRooms } = req.body;
     
     // admin может менять любого, пользователь - только себя (без смены роли)
-    if (req.user.role !== 'admin' && req.user.userId !== userId) {
+    if (!req.user || (req.user.role !== 'admin' && req.user.userId !== userId)) {
       return res.status(403).json({ message: 'Нет прав' });
     }
 
@@ -212,7 +212,7 @@ exports.updateUser = async (req, res) => {
 // ========================
 exports.deleteUser = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (!req.user || req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав (только admin)' });
     }
     const userId = req.params.id;

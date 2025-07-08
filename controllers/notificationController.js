@@ -3,6 +3,11 @@ const Notification = require('../models/Notification');
 
 exports.createNotification = async (req, res) => {
   try {
+    // Проверяем, что пользователь аутентифицирован
+    if (!req.user) {
+      return res.status(401).json({ message: 'Необходима аутентификация' });
+    }
+    
     // teacher / admin
     if (req.user.role === 'student') {
       return res.status(403).json({ message: 'Студент не может создавать уведомления' });
@@ -17,6 +22,11 @@ exports.createNotification = async (req, res) => {
 
 exports.getAllNotifications = async (req, res) => {
   try {
+    // Проверяем, что пользователь аутентифицирован
+    if (!req.user) {
+      return res.status(401).json({ message: 'Необходима аутентификация' });
+    }
+    
     if (req.user.role === 'student') {
       const notifs = await Notification.find({
         recipients: { $in: [req.user.userId] },
@@ -34,6 +44,11 @@ exports.getAllNotifications = async (req, res) => {
 
 exports.getNotificationById = async (req, res) => {
   try {
+    // Проверяем, что пользователь аутентифицирован
+    if (!req.user) {
+      return res.status(401).json({ message: 'Необходима аутентификация' });
+    }
+    
     const notif = await Notification.findById(req.params.id);
     if (!notif) {
       return res.status(404).json({ message: 'Не найдено' });
@@ -51,6 +66,11 @@ exports.getNotificationById = async (req, res) => {
 
 exports.updateNotification = async (req, res) => {
   try {
+    // Проверяем, что пользователь аутентифицирован
+    if (!req.user) {
+      return res.status(401).json({ message: 'Необходима аутентификация' });
+    }
+    
     // student может менять isRead = true, teacher/admin могут менять title/message
     const { title, message, recipients, isRead } = req.body;
     const updated = await Notification.findByIdAndUpdate(
@@ -69,6 +89,11 @@ exports.updateNotification = async (req, res) => {
 
 exports.deleteNotification = async (req, res) => {
   try {
+    // Проверяем, что пользователь аутентифицирован
+    if (!req.user) {
+      return res.status(401).json({ message: 'Необходима аутентификация' });
+    }
+    
     // teacher / admin
     if (req.user.role === 'student') {
       return res.status(403).json({ message: 'Нет прав' });

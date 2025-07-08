@@ -7,6 +7,16 @@ const gradeSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  teacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  classId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Classroom',
+    required: true,
+  },
   subject: {
     type: String,
     required: true,
@@ -28,10 +38,13 @@ const gradeSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Оценка обязательна'],
   },
-  date: {
-    type: Date,
-    default: Date.now,
+  // Комментарий к оценке
+  comment: {
+    type: String,
+    default: '',
   },
+}, {
+  timestamps: true,
 });
 
 module.exports = mongoose.model('Grade', gradeSchema);

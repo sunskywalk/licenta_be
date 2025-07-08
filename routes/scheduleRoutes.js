@@ -2,21 +2,30 @@
 const express = require('express');
 const router = express.Router();
 const scheduleController = require('../controllers/scheduleController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, checkRole } = require('../middleware/authMiddleware');
 
 // создать расписание (admin)
-router.post('/', protect, scheduleController.createSchedule);
+router.post('/', protect, checkRole(['admin']), scheduleController.createSchedule);
 
 // получить все
 router.get('/', protect, scheduleController.getAllSchedules);
+
+// получить расписание для конкретного учителя
+router.get('/teacher/:teacherId', protect, checkRole(['teacher', 'admin']), scheduleController.getTeacherSchedule);
+
+// получить расписание для конкретного класса
+router.get('/class/:classId', protect, scheduleController.getScheduleByClass);
+
+// получить расписание для конкретного дня недели
+router.get('/day/:dayOfWeek', protect, scheduleController.getScheduleByDay);
 
 // получить одно
 router.get('/:id', protect, scheduleController.getScheduleById);
 
 // обновить (admin)
-router.put('/:id', protect, scheduleController.updateSchedule);
+router.put('/:id', protect, checkRole(['admin']), scheduleController.updateSchedule);
 
 // удалить (admin)
-router.delete('/:id', protect, scheduleController.deleteSchedule);
+router.delete('/:id', protect, checkRole(['admin']), scheduleController.deleteSchedule);
 
 module.exports = router;

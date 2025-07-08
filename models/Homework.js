@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const homeworkSchema = new mongoose.Schema({
-  classroom: {
+  classId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Classroom',
     required: [true, 'Нужно указать класс (Classroom)'],
@@ -27,10 +27,12 @@ const homeworkSchema = new mongoose.Schema({
     type: Date,
     required: [true, 'Нужно указать дату сдачи'],
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
+  assignedTo: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+}, {
+  timestamps: true,
 });
 
 module.exports = mongoose.model('Homework', homeworkSchema);

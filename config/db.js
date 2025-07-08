@@ -1,4 +1,3 @@
-// config/db.js
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
@@ -7,12 +6,14 @@ const connectDB = async () => {
     await mongoose.connect(MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      family: 4,
     });
     console.log('✅ MongoDB connected!');
   } catch (err) {
     console.error('❌ Error connecting to MongoDB:', err.message);
-    process.exit(1); // Остановить сервер, если база не подключена
+    process.exit(1);
   }
 };
 
-module.exports = connectDB;
+module.exports = connectDB; // 👈 ВОТ ЭТО ВАЖНО

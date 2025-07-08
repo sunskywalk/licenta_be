@@ -7,6 +7,16 @@ const attendanceSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  teacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  classId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Classroom',
+    required: true,
+  },
   subject: {
     type: String,
     required: [true, 'Название предмета обязательно'],
@@ -20,6 +30,8 @@ const attendanceSchema = new mongoose.Schema({
     enum: ['present', 'absent', 'late', 'excused'],
     default: 'present',
   },
+}, {
+  timestamps: true,
 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);
