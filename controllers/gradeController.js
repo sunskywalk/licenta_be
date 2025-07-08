@@ -258,6 +258,38 @@ exports.getTeacherSubjects = async (req, res) => {
 };
 
 // ============================
+// Получение предметов конкретного учителя по ID (для админов)
+// ============================
+exports.getTeacherSubjectsById = async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    console.log('[getTeacherSubjectsById] teacherId:', teacherId);
+    
+    // Проверяем права - только админы могут получать предметы других учителей
+    if (req.user.role !== 'admin' && req.user.userId !== teacherId) {
+      return res.status(403).json({ message: 'Нет прав для получения предметов этого учителя' });
+    }
+    
+    // Получаем все уникальные предметы учителя
+    const subjects = await Grade.distinct('subject', { teacher: teacherId });
+    console.log('[getTeacherSubjectsById] Found subjects:', subjects);
+    
+    // Для каждого предмета считаем количество оценок
+    const subjectsWithCounts = await Promise.all(
+      subjects.map(async (subject) => {
+        const count = await Grade.countDocuments({ teacher: teacherId, subject });
+        return { subject, gradeCount: count };
+      })
+    );
+    
+    res.json(subjectsWithCounts);
+  } catch (error) {
+    console.error('Error in getTeacherSubjectsById:', error);
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// ============================
 // Получение классов по предмету
 // ============================
 exports.getClassroomsForSubject = async (req, res) => {

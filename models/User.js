@@ -21,6 +21,16 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'teacher', 'student'],
     default: 'student',
   },
+  // Код учителя для идентификации
+  teacherCode: {
+    type: String,
+    sparse: true, // Только для учителей
+  },
+  // Предметы, которые преподает учитель
+  subjects: {
+    type: [String],
+    default: [],
+  },
   // Ссылка на класс (для учеников). Учитель может быть в нескольких классах, 
   // поэтому сделаем массив для teacher, но это можно адаптировать под разные сценарии.
   classRooms: [

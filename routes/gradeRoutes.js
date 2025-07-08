@@ -21,6 +21,7 @@ router.delete('/:id', protect, gradeController.deleteGrade);
 
 // Методы для учителя
 router.get('/teacher/:teacherId', protect, gradeController.getTeacherGrades);
+router.get('/teacher/:teacherId/subjects', protect, gradeController.getTeacherSubjectsById);
 
 // Методы для студента
 router.get('/student/:studentId', protect, gradeController.getStudentGrades);
