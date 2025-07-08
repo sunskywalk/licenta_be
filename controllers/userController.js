@@ -114,6 +114,19 @@ exports.getAllUsers = async (req, res) => {
 };
 
 // ========================
+// 3.5. Получить только администраторов (для поддержки)
+// ========================
+exports.getAdminUsers = async (req, res) => {
+  try {
+    // Любой авторизованный пользователь может получить список админов для отправки поддержки
+    const adminUsers = await User.find({ role: 'admin' }).select('_id name email role');
+    res.json(adminUsers);
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка при получении администраторов', error: error.message });
+  }
+};
+
+// ========================
 // 4. Получить 1 пользователя
 // ========================
 exports.getUserById = async (req, res) => {

@@ -13,6 +13,9 @@ router.post('/register', protect, userController.registerUser);
 // Список пользователей (admin)
 router.get('/', protect, userController.getAllUsers);
 
+// Получить админов (для отправки уведомлений поддержки)
+router.get('/admins', protect, userController.getAdminUsers);
+
 // Получить 1
 router.get('/:id', protect, userController.getUserById);
 
