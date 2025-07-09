@@ -10,6 +10,12 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Текст уведомления обязателен'],
   },
+  // Тип уведомления
+  type: {
+    type: String,
+    enum: ['general', 'support', 'admin', 'teacher'],
+    default: 'general',
+  },
   // Можно отправлять уведомления конкретному пользователю (либо массиву)
   recipients: [
     {
@@ -17,6 +23,11 @@ const notificationSchema = new mongoose.Schema({
       ref: 'User',
     },
   ],
+  // Отправитель уведомления
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
   // Признак, что уведомление прочитано
   isRead: {
     type: Boolean,

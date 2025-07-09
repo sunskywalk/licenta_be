@@ -72,3 +72,4 @@ docker-compose.override.yml
 # Other
 *.bak
 *.old
+template_licenta_dizertatie_ro.tex

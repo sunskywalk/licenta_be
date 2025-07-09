@@ -8,12 +8,40 @@ exports.createNotification = async (req, res) => {
       return res.status(401).json({ message: 'Необходима аутентификация' });
     }
     
-    // teacher / admin
+    const { title, message, recipients, type } = req.body;
+    
+    // Проверяем права на создание уведомлений
     if (req.user.role === 'student') {
-      return res.status(403).json({ message: 'Студент не может создавать уведомления' });
+      // Студенты могут создавать только уведомления поддержки
+      if (type !== 'support') {
+        return res.status(403).json({ message: 'Студент может создавать только уведомления поддержки' });
+      }
+      
+      // Для уведомлений поддержки получаем всех админов
+      const User = require('../models/User');
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      const adminIds = admins.map(admin => admin._id);
+      
+      const notif = await Notification.create({ 
+        title, 
+        message, 
+        type: 'support',
+        recipients: adminIds,
+        senderId: req.user.userId
+      });
+      
+      return res.status(201).json({ message: 'Запрос поддержки отправлен', notification: notif });
     }
-    const { title, message, recipients } = req.body;
-    const notif = await Notification.create({ title, message, recipients: recipients || [] });
+    
+    // teacher / admin могут создавать любые уведомления
+    const notif = await Notification.create({ 
+      title, 
+      message, 
+      type: type || 'general',
+      recipients: recipients || [],
+      senderId: req.user.userId
+    });
+    
     res.status(201).json({ message: 'Уведомление создано', notification: notif });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -30,11 +58,15 @@ exports.getAllNotifications = async (req, res) => {
     if (req.user.role === 'student') {
       const notifs = await Notification.find({
         recipients: { $in: [req.user.userId] },
-      }).sort({ createdAt: -1 });
+      })
+      .populate('senderId', 'name role')
+      .sort({ createdAt: -1 });
       return res.json(notifs);
     } else {
       // teacher / admin видят все
-      const notifs = await Notification.find().sort({ createdAt: -1 });
+      const notifs = await Notification.find()
+        .populate('senderId', 'name role')
+        .sort({ createdAt: -1 });
       return res.json(notifs);
     }
   } catch (error) {
