@@ -1,5 +1,7 @@
 // controllers/gradeController.js
 const Grade = require('../models/Grade');
+const User = require('../models/User');
+const Attendance = require('../models/Attendance');
 
 exports.createGrade = async (req, res) => {
   try {
@@ -316,5 +318,258 @@ exports.getClassroomsForSubject = async (req, res) => {
   } catch (error) {
     console.error('Error in getClassroomsForSubject:', error);
     res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// Получить статистику оценок студента
+exports.getStudentGradeStats = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    console.log(`📊 Fetching grade stats for student: ${studentId}`);
+    
+    // Получаем все оценки студента
+    const studentGrades = await Grade.find({ student: studentId }).populate('student', 'name');
+    
+    if (studentGrades.length === 0) {
+      return res.json({
+        averageGrade: 0,
+        totalGrades: 0,
+        subjects: [],
+        classRankByGrades: null,
+        classRankByAttendance: null,
+        attendanceRate: 0
+      });
+    }
+    
+    // Получаем студента и его класс
+    const student = await User.findById(studentId);
+    const classmates = await User.find({ 
+      role: 'student', 
+      classId: student.classId 
+    });
+    
+    // Статистика по предметам
+    const subjectStats = {};
+    studentGrades.forEach(grade => {
+      if (!subjectStats[grade.subject]) {
+        subjectStats[grade.subject] = {
+          grades: [],
+          total: 0,
+          count: 0,
+          finalGrade: null
+        };
+      }
+      
+      if (grade.type === 'final') {
+        subjectStats[grade.subject].finalGrade = grade.value;
+      } else {
+        subjectStats[grade.subject].grades.push(grade.value);
+        subjectStats[grade.subject].total += grade.value;
+        subjectStats[grade.subject].count++;
+      }
+    });
+    
+    // Рассчитываем средние оценки по предметам
+    const subjects = Object.keys(subjectStats).map(subject => ({
+      name: subject,
+      averageGrade: subjectStats[subject].count > 0 
+        ? (subjectStats[subject].total / subjectStats[subject].count).toFixed(1)
+        : 0,
+      finalGrade: subjectStats[subject].finalGrade || null,
+      totalGrades: subjectStats[subject].count
+    }));
+    
+    // Общая средняя оценка
+    const totalGradesSum = studentGrades
+      .filter(g => g.type !== 'final')
+      .reduce((sum, grade) => sum + grade.value, 0);
+    const totalGradesCount = studentGrades.filter(g => g.type !== 'final').length;
+    const averageGrade = totalGradesCount > 0 ? (totalGradesSum / totalGradesCount).toFixed(1) : 0;
+    
+    // Посещаемость студента
+    const attendanceRecords = await Attendance.find({ student: studentId });
+    const totalAttendance = attendanceRecords.length;
+    const presentCount = attendanceRecords.filter(a => a.status === 'present').length;
+    const attendanceRate = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+    
+    // Рейтинг в классе по оценкам
+    const classGradeRanking = [];
+    for (const classmate of classmates) {
+      const classmateGrades = await Grade.find({ 
+        student: classmate._id, 
+        type: { $ne: 'final' } 
+      });
+      
+      if (classmateGrades.length > 0) {
+        const classmateAverage = classmateGrades.reduce((sum, g) => sum + g.value, 0) / classmateGrades.length;
+        classGradeRanking.push({
+          studentId: classmate._id,
+          name: classmate.name,
+          average: classmateAverage
+        });
+      }
+    }
+    
+    // Сортируем по убыванию средней оценки
+    classGradeRanking.sort((a, b) => b.average - a.average);
+    const gradeRankPosition = classGradeRanking.findIndex(r => r.studentId.toString() === studentId) + 1;
+    
+    // Рейтинг в классе по посещаемости
+    const classAttendanceRanking = [];
+    for (const classmate of classmates) {
+      const classmateAttendance = await Attendance.find({ student: classmate._id });
+      const classmateTotal = classmateAttendance.length;
+      const classmatePresent = classmateAttendance.filter(a => a.status === 'present').length;
+      const classmateRate = classmateTotal > 0 ? (classmatePresent / classmateTotal) * 100 : 0;
+      
+      classAttendanceRanking.push({
+        studentId: classmate._id,
+        name: classmate.name,
+        rate: classmateRate
+      });
+    }
+    
+    // Сортируем по убыванию посещаемости
+    classAttendanceRanking.sort((a, b) => b.rate - a.rate);
+    const attendanceRankPosition = classAttendanceRanking.findIndex(r => r.studentId.toString() === studentId) + 1;
+    
+    console.log(`📈 Student stats: avg=${averageGrade}, attendance=${attendanceRate}%, gradeRank=${gradeRankPosition}, attendanceRank=${attendanceRankPosition}`);
+    
+    res.json({
+      averageGrade: parseFloat(averageGrade),
+      totalGrades: totalGradesCount,
+      subjects: subjects,
+      classRankByGrades: gradeRankPosition,
+      classRankByAttendance: attendanceRankPosition,
+      attendanceRate: attendanceRate,
+      totalClassmates: classmates.length
+    });
+    
+  } catch (error) {
+    console.error('Error fetching student grade stats:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Получить детальную статистику по предмету
+exports.getStudentSubjectStats = async (req, res) => {
+  try {
+    const { studentId, subject } = req.params;
+    
+    console.log(`📚 Fetching subject stats for student: ${studentId}, subject: ${subject}`);
+    
+    // Получаем все оценки студента по предмету
+    const grades = await Grade.find({ 
+      student: studentId, 
+      subject: subject 
+    }).sort({ createdAt: -1 });
+    
+    if (grades.length === 0) {
+      return res.json({
+        subject: subject,
+        averageGrade: 0,
+        finalGrade: null,
+        grades: [],
+        attendanceRate: 0,
+        classRankByGrades: null,
+        classRankByAttendance: null
+      });
+    }
+    
+    // Получаем студента и его класс
+    const student = await User.findById(studentId);
+    const classmates = await User.find({ 
+      role: 'student', 
+      classId: student.classId 
+    });
+    
+    // Разделяем оценки на обычные и итоговые
+    const regularGrades = grades.filter(g => g.type !== 'final');
+    const finalGrade = grades.find(g => g.type === 'final');
+    
+    // Средняя оценка по предмету
+    const averageGrade = regularGrades.length > 0 
+      ? (regularGrades.reduce((sum, g) => sum + g.value, 0) / regularGrades.length).toFixed(1)
+      : 0;
+    
+    // Посещаемость по предмету
+    const attendanceRecords = await Attendance.find({ 
+      student: studentId, 
+      subject: subject 
+    });
+    const totalAttendance = attendanceRecords.length;
+    const presentCount = attendanceRecords.filter(a => a.status === 'present').length;
+    const attendanceRate = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+    
+    // Рейтинг в классе по предмету (оценки)
+    const classSubjectRanking = [];
+    for (const classmate of classmates) {
+      const classmateGrades = await Grade.find({ 
+        student: classmate._id, 
+        subject: subject,
+        type: { $ne: 'final' } 
+      });
+      
+      if (classmateGrades.length > 0) {
+        const classmateAverage = classmateGrades.reduce((sum, g) => sum + g.value, 0) / classmateGrades.length;
+        classSubjectRanking.push({
+          studentId: classmate._id,
+          name: classmate.name,
+          average: classmateAverage
+        });
+      }
+    }
+    
+    classSubjectRanking.sort((a, b) => b.average - a.average);
+    const subjectGradeRank = classSubjectRanking.findIndex(r => r.studentId.toString() === studentId) + 1;
+    
+    // Рейтинг в классе по предмету (посещаемость)
+    const classSubjectAttendanceRanking = [];
+    for (const classmate of classmates) {
+      const classmateAttendance = await Attendance.find({ 
+        student: classmate._id, 
+        subject: subject 
+      });
+      const classmateTotal = classmateAttendance.length;
+      const classmatePresent = classmateAttendance.filter(a => a.status === 'present').length;
+      const classmateRate = classmateTotal > 0 ? (classmatePresent / classmateTotal) * 100 : 0;
+      
+      classSubjectAttendanceRanking.push({
+        studentId: classmate._id,
+        name: classmate.name,
+        rate: classmateRate
+      });
+    }
+    
+    classSubjectAttendanceRanking.sort((a, b) => b.rate - a.rate);
+    const subjectAttendanceRank = classSubjectAttendanceRanking.findIndex(r => r.studentId.toString() === studentId) + 1;
+    
+    // Форматируем оценки для отображения
+    const formattedGrades = regularGrades.map(grade => ({
+      _id: grade._id,
+      value: grade.value,
+      type: grade.type,
+      comment: grade.comment || '',
+      date: grade.createdAt,
+      createdAt: grade.createdAt
+    }));
+    
+    console.log(`📊 Subject stats: ${subject}, avg=${averageGrade}, grades=${formattedGrades.length}`);
+    
+    res.json({
+      subject: subject,
+      averageGrade: parseFloat(averageGrade),
+      finalGrade: finalGrade ? finalGrade.value : null,
+      grades: formattedGrades,
+      attendanceRate: attendanceRate,
+      classRankByGrades: subjectGradeRank,
+      classRankByAttendance: subjectAttendanceRank,
+      totalClassmates: classmates.length
+    });
+    
+  } catch (error) {
+    console.error('Error fetching subject stats:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };

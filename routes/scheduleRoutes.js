@@ -16,6 +16,9 @@ router.get('/teacher/:teacherId', protect, checkRole(['teacher', 'admin']), sche
 // получить расписание для конкретного класса
 router.get('/class/:classId', protect, scheduleController.getScheduleByClass);
 
+// получить детали урока для студента
+router.get('/student/:studentId/lesson/:subject/:date', protect, scheduleController.getStudentLessonDetails);
+
 // получить расписание для конкретного дня недели
 router.get('/day/:dayOfWeek', protect, scheduleController.getScheduleByDay);
 

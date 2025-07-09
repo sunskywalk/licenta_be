@@ -25,14 +25,14 @@ app.get('/api/ping', (_, res) => res.send('pong'));
 // ────────────────────── Основные роуты ──────────────────
 app.use('/api/users',        require('./routes/userRoutes'));
 app.use('/api/classes',      require('./routes/classRoutes'));
-app.use('/api/schedules',    require('./routes/scheduleRoutes'));
+app.use('/api/schedule',     require('./routes/scheduleRoutes'));
 app.use('/api/grades',       require('./routes/gradeRoutes'));
 app.use('/api/attendance',   require('./routes/attendanceRoutes'));
 app.use('/api/homeworks',    require('./routes/homeworkRoutes'));
 app.use('/api/notifications',require('./routes/notificationRoutes'));
 app.use('/api/stats',        require('./routes/statsRoutes'));
 
-const PORT = process.env.PORT || 5050;
+const PORT = process.env.PORT || 3000;
 
 // ────────────────────── Запуск ──────────────────────────
 (async () => {

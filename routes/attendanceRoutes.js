@@ -15,7 +15,8 @@ const {
   getClassAttendanceStats,
   getAttendanceByClass,
   getAttendanceByDate,
-  createBulkAttendance
+  createBulkAttendance,
+  getStudentAttendanceWithGrades
 } = require('../controllers/attendanceController');
 const { protect, checkRole } = require('../middleware/authMiddleware');
 
@@ -38,6 +39,7 @@ router.get('/class/:classId/stats', protect, checkRole(['teacher', 'admin']), ge
 router.get('/date/:date', protect, checkRole(['teacher', 'admin']), getAttendanceByDate);
 
 router.get('/student/:studentId', protect, checkRole(['student', 'teacher', 'admin']), getStudentAttendance);
+router.get('/student/:studentId/with-grades', protect, checkRole(['student', 'teacher', 'admin']), getStudentAttendanceWithGrades);
 router.get('/student/:studentId/stats', protect, checkRole(['student', 'teacher', 'admin']), getStudentAttendanceStats);
 router.get('/teacher/:teacherId', protect, checkRole(['teacher', 'admin']), getTeacherAttendance);
 

@@ -25,6 +25,8 @@ router.get('/teacher/:teacherId/subjects', protect, gradeController.getTeacherSu
 
 // Методы для студента
 router.get('/student/:studentId', protect, gradeController.getStudentGrades);
+router.get('/student/:studentId/stats', protect, gradeController.getStudentGradeStats);
+router.get('/student/:studentId/subject/:subject', protect, gradeController.getStudentSubjectStats);
 
 // Методы для класса
 router.get('/class/:classId', protect, gradeController.getGradesByClass);

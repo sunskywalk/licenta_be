@@ -1,6 +1,9 @@
 // controllers/scheduleController.js
 const Schedule = require('../models/Schedule');
 const Classroom = require('../models/Classroom');
+const User = require('../models/User');
+const Grade = require('../models/Grade');
+const Homework = require('../models/Homework');
 
 // Функция проверки конфликтов расписания
 const checkScheduleConflicts = async (classId, dayOfWeek, periods, excludeScheduleId = null) => {
@@ -269,5 +272,83 @@ exports.getScheduleByDay = async (req, res) => {
   } catch (error) {
     console.error('Error fetching day schedule:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Получить детали урока для студента
+exports.getStudentLessonDetails = async (req, res) => {
+  try {
+    const { studentId, subject, date } = req.params;
+    
+    console.log(`📚 Fetching lesson details for student: ${studentId}, subject: ${subject}, date: ${date}`);
+    
+    // Парсим дату
+    const lessonDate = new Date(date);
+    const startOfDay = new Date(lessonDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(lessonDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Получаем студента и его класс
+    const student = await User.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    
+    // Получаем оценки за этот урок
+    const grades = await Grade.find({
+      student: studentId,
+      subject: subject,
+      createdAt: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    }).sort({ createdAt: -1 });
+    
+    // Получаем домашние задания по предмету (активные на эту дату)
+    const homework = await Homework.find({
+      subject: subject,
+      $or: [
+        { dueDate: { $gte: startOfDay, $lte: endOfDay } }, // Задания на сегодня
+        { 
+          createdAt: { $lte: endOfDay },
+          dueDate: { $gte: lessonDate } // Активные задания
+        }
+      ]
+    }).sort({ createdAt: -1 }).limit(3);
+    
+    // Получаем последний комментарий учителя по этому предмету
+    const recentGradeWithComment = await Grade.findOne({
+      student: studentId,
+      subject: subject,
+      comment: { $exists: true, $ne: '' }
+    }).sort({ createdAt: -1 });
+    
+    console.log(`📊 Found ${grades.length} grades, ${homework.length} homework, comment: ${recentGradeWithComment?.comment || 'none'}`);
+    
+    res.json({
+      subject: subject,
+      date: date,
+      grades: grades.map(grade => ({
+        _id: grade._id,
+        value: grade.value,
+        type: grade.type,
+        comment: grade.comment || '',
+        createdAt: grade.createdAt
+      })),
+      homework: homework.map(hw => ({
+        _id: hw._id,
+        title: hw.title,
+        description: hw.description || '',
+        dueDate: hw.dueDate,
+        createdAt: hw.createdAt
+      })),
+      teacherComment: recentGradeWithComment?.comment || null,
+      lastCommentDate: recentGradeWithComment?.createdAt || null
+    });
+    
+  } catch (error) {
+    console.error('Error fetching lesson details:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };

@@ -2,6 +2,7 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
 const Classroom = require('../models/Classroom');
+const Grade = require('../models/Grade');
 
 // @desc    Mark attendance for a student
 // @route   POST /api/attendance/mark
@@ -356,5 +357,52 @@ exports.createBulkAttendance = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка создания записей', error: error.message });
+  }
+};
+
+// @desc    Get attendance for student with grades
+// @route   GET /api/attendance/student/:studentId/with-grades
+// @access  Private
+exports.getStudentAttendanceWithGrades = async (req, res) => {
+    try {
+        const studentId = req.params.studentId;
+        console.log('📊 Fetching attendance with grades for student:', studentId);
+        
+        const attendance = await Attendance.find({ student: studentId })
+            .populate('classId', 'name')
+            .populate('teacher', 'name')
+            .sort({ date: -1 });
+        
+        // Получаем оценки студента
+        const grades = await Grade.find({ student: studentId })
+            .sort({ date: -1 });
+        
+        // Объединяем данные посещаемости с оценками
+        const attendanceWithGrades = attendance.map(att => {
+            // Ищем оценку за тот же день и предмет
+            const matchingGrade = grades.find(grade => {
+                const gradeDate = new Date(grade.date);
+                const attDate = new Date(att.date);
+                return (
+                    gradeDate.toDateString() === attDate.toDateString() &&
+                    grade.subject === att.subject
+                );
+            });
+            
+            return {
+                ...att.toObject(),
+                grade: matchingGrade ? {
+                    value: matchingGrade.value,
+                    type: matchingGrade.type,
+                    comment: matchingGrade.comment
+                } : null
+            };
+        });
+        
+        console.log('📋 Found attendance with grades:', attendanceWithGrades.length);
+        res.json(attendanceWithGrades);
+    } catch (error) {
+        console.error('❌ Error fetching student attendance with grades:', error);
+        res.status(500).json({ message: 'Ошибка сервера', error: error.message });
   }
 };

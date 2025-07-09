@@ -13,10 +13,23 @@ router.get('/', protect, classController.getAllClasses);
 // Получить 1
 router.get('/:id', protect, classController.getClassById);
 
+// Получить класс с детальной статистикой (admin)
+router.get('/:id/stats', protect, classController.getClassWithStats);
+
 // Обновить (admin)
 router.put('/:id', protect, classController.updateClass);
 
 // Удалить (admin)
 router.delete('/:id', protect, classController.deleteClass);
+
+// Управление учениками в классах
+router.post('/students/add', protect, classController.addStudentToClass);
+router.post('/students/remove', protect, classController.removeStudentFromClass);
+router.get('/students/available', protect, classController.getAvailableStudents);
+
+// Получение данных для создания класса
+router.get('/data/teachers', protect, classController.getAllTeachers);
+router.get('/data/students', protect, classController.getAllStudentsForClass);
+router.get('/data/subjects', protect, classController.getSubjectsList);
 
 module.exports = router;
