@@ -60,13 +60,27 @@ exports.getAllNotifications = async (req, res) => {
         recipients: { $in: [req.user.userId] },
       })
       .populate('senderId', 'name role')
+      .populate('replyTo', 'title')
       .sort({ createdAt: -1 });
       return res.json(notifs);
-    } else {
-      // teacher / admin видят все
+    } else if (req.user.role === 'admin') {
+      // Админы видят все уведомления
       const notifs = await Notification.find()
         .populate('senderId', 'name role')
+        .populate('replyTo', 'title')
         .sort({ createdAt: -1 });
+      return res.json(notifs);
+    } else {
+      // Учителя видят только свои уведомления и те, где они получатели
+      const notifs = await Notification.find({
+        $or: [
+          { senderId: req.user.userId },
+          { recipients: { $in: [req.user.userId] } }
+        ]
+      })
+      .populate('senderId', 'name role')
+      .populate('replyTo', 'title')
+      .sort({ createdAt: -1 });
       return res.json(notifs);
     }
   } catch (error) {
@@ -137,5 +151,49 @@ exports.deleteNotification = async (req, res) => {
     res.json({ message: 'Уведомление удалено' });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
+// Ответ на уведомление (только для админов)
+exports.replyToNotification = async (req, res) => {
+  try {
+    // Проверяем, что пользователь аутентифицирован
+    if (!req.user) {
+      return res.status(401).json({ message: 'Необходима аутентификация' });
+    }
+    
+    // Только админы могут отвечать на уведомления
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Только администраторы могут отвечать на уведомления' });
+    }
+    
+    const { title, message } = req.body;
+    const originalNotificationId = req.params.id;
+    
+    // Находим оригинальное уведомление
+    const originalNotification = await Notification.findById(originalNotificationId)
+      .populate('senderId', 'name role');
+      
+    if (!originalNotification) {
+      return res.status(404).json({ message: 'Оригинальное уведомление не найдено' });
+    }
+    
+    // Создаем ответ, отправляем его автору оригинального уведомления
+    const replyNotification = await Notification.create({
+      title: `Re: ${originalNotification.title}`,
+      message: message,
+      type: 'info',
+      recipients: [originalNotification.senderId._id],
+      senderId: req.user.userId,
+      replyTo: originalNotificationId,
+      isReply: true
+    });
+    
+    res.status(201).json({ 
+      message: 'Ответ отправлен', 
+      notification: replyNotification 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Ошибка при отправке ответа', error: error.message });
   }
 };

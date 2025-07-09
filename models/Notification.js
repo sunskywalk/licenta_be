@@ -13,8 +13,8 @@ const notificationSchema = new mongoose.Schema({
   // Тип уведомления
   type: {
     type: String,
-    enum: ['general', 'support', 'admin', 'teacher'],
-    default: 'general',
+    enum: ['info', 'warning', 'success', 'error', 'support', 'general', 'admin', 'teacher'],
+    default: 'info',
   },
   // Можно отправлять уведомления конкретному пользователю (либо массиву)
   recipients: [
@@ -27,6 +27,16 @@ const notificationSchema = new mongoose.Schema({
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
+  },
+  // Ответ на уведомление (если это ответ)
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Notification',
+  },
+  // Является ли это ответом
+  isReply: {
+    type: Boolean,
+    default: false,
   },
   // Признак, что уведомление прочитано
   isRead: {
