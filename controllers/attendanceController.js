@@ -17,11 +17,11 @@ exports.markAttendance = async (req, res) => {
   try {
     console.log('📝 Marking attendance:', { student, classId, subject, date, status, teacher });
     
-    // Конвертируем дату в правильный формат
-    const attendanceDate = new Date(date);
-    attendanceDate.setHours(0, 0, 0, 0); // Убираем время, оставляем только дату
     
-    // Ищем существующую запись сначала по основным полям
+    const attendanceDate = new Date(date);
+    attendanceDate.setHours(0, 0, 0, 0); 
+    
+    
     const basicSearchCondition = { 
       student, 
       classId, 
@@ -31,10 +31,10 @@ exports.markAttendance = async (req, res) => {
     
     console.log('🔍 Basic search condition:', basicSearchCondition);
     
-    // Ищем существующую запись
+   
     let existingAttendance = await Attendance.findOne(basicSearchCondition);
     
-    // Если найдена запись от другого учителя, создаем новую
+    
     if (existingAttendance && String(existingAttendance.teacher) !== String(teacher)) {
       console.log('⚠️ Found attendance from different teacher:', existingAttendance.teacher, 'vs', teacher);
       existingAttendance = null; // Создадим новую запись
