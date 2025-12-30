@@ -22,6 +22,9 @@ router.put('/:id', protect, classController.updateClass);
 // Удалить (admin)
 router.delete('/:id', protect, classController.deleteClass);
 
+// Назначить классного руководителя (admin)
+router.put('/:id/homeroom-teacher', protect, classController.assignHomeroomTeacher);
+
 // Управление учениками в классах
 router.post('/students/add', protect, classController.addStudentToClass);
 router.post('/students/remove', protect, classController.removeStudentFromClass);

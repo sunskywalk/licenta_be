@@ -28,7 +28,8 @@ exports.getAllClasses = async (req, res) => {
     // Но если нужно ограничить — можете поставить checkRole
     const classes = await Classroom.find()
       .populate('teachers', '-password')
-      .populate('students', '-password');
+      .populate('students', '-password')
+      .populate('homeroomTeacher', 'name email');
     res.json(classes);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка при получении классов', error: error.message });
@@ -39,7 +40,8 @@ exports.getClassById = async (req, res) => {
   try {
     const cls = await Classroom.findById(req.params.id)
       .populate('teachers', '-password')
-      .populate('students', '-password');
+      .populate('students', '-password')
+      .populate('homeroomTeacher', 'name email');
     if (!cls) {
       return res.status(404).json({ message: 'Класс не найден' });
     }
@@ -68,7 +70,7 @@ exports.updateClass = async (req, res) => {
 
     // Опционально: можно синхронизировать user.classRooms
     // Для простоты опустим.
-    
+
     res.json({
       message: 'Класс обновлён',
       classroom: await Classroom.findById(req.params.id)
@@ -104,19 +106,72 @@ exports.deleteClass = async (req, res) => {
   }
 };
 
+// Назначить классного руководителя (admin only)
+exports.assignHomeroomTeacher = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Только admin может назначать классных руководителей' });
+    }
+
+    const { id } = req.params;
+    const { teacherId } = req.body;
+
+    const cls = await Classroom.findById(id);
+    if (!cls) {
+      return res.status(404).json({ message: 'Класс не найден' });
+    }
+
+    // Если teacherId = null, снимаем классрука
+    if (!teacherId) {
+      cls.homeroomTeacher = null;
+      await cls.save();
+      return res.json({ message: 'Классный руководитель снят', classroom: cls });
+    }
+
+    // Проверяем, что учитель существует и является учителем
+    const teacher = await User.findById(teacherId);
+    if (!teacher) {
+      return res.status(404).json({ message: 'Учитель не найден' });
+    }
+    if (teacher.role !== 'teacher') {
+      return res.status(400).json({ message: 'Пользователь не является учителем' });
+    }
+
+    cls.homeroomTeacher = teacherId;
+    await cls.save();
+
+    const updatedClass = await Classroom.findById(id)
+      .populate('homeroomTeacher', 'name email')
+      .populate('teachers', 'name email')
+      .populate('students', 'name email');
+
+    res.json({ message: 'Классный руководитель назначен', classroom: updatedClass });
+  } catch (error) {
+    console.error('Error assigning homeroom teacher:', error);
+    res.status(500).json({ message: 'Ошибка при назначении классного руководителя', error: error.message });
+  }
+};
+
 // Получение класса с детальной статистикой
 exports.getClassWithStats = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Только admin может просматривать детальную статистику' });
-    }
-
     const cls = await Classroom.findById(req.params.id)
       .populate('teachers', '-password')
-      .populate('students', '-password');
-    
+      .populate('students', '-password')
+      .populate('homeroomTeacher', 'name email');
+
     if (!cls) {
       return res.status(404).json({ message: 'Класс не найден' });
+    }
+
+    // Проверка прав: admin или классный руководитель этого класса
+    const isHomeroomTeacher = cls.homeroomTeacher &&
+      String(cls.homeroomTeacher._id) === String(req.user.userId);
+
+    if (req.user.role !== 'admin' && !isHomeroomTeacher) {
+      return res.status(403).json({
+        message: 'Только admin или классный руководитель могут просматривать детальную статистику класса'
+      });
     }
 
     // Получаем статистику для каждого ученика
@@ -129,17 +184,17 @@ exports.getClassWithStats = async (req, res) => {
     for (const student of cls.students) {
       // Получаем оценки ученика
       const grades = await Grade.find({ student: student._id }).populate('teacher', 'name');
-      
+
       // Вычисляем средний балл
       const regularGrades = grades.filter(g => g.type !== 'final');
-      const averageGrade = regularGrades.length > 0 
-        ? regularGrades.reduce((sum, g) => sum + g.value, 0) / regularGrades.length 
+      const averageGrade = regularGrades.length > 0
+        ? regularGrades.reduce((sum, g) => sum + g.value, 0) / regularGrades.length
         : 0;
 
       // Получаем посещаемость за последние 30 дней
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
+
       const attendanceRecords = await Attendance.find({
         student: student._id,
         date: { $gte: thirtyDaysAgo }
@@ -183,10 +238,10 @@ exports.getClassWithStats = async (req, res) => {
     const classStats = {
       totalStudents: cls.students.length,
       totalGrades: totalGrades,
-      averageGrade: cls.students.length > 0 
+      averageGrade: cls.students.length > 0
         ? Math.round((studentsWithStats.reduce((sum, s) => sum + s.averageGrade, 0) / cls.students.length) * 100) / 100
         : 0,
-      attendanceRate: cls.students.length > 0 
+      attendanceRate: cls.students.length > 0
         ? Math.round(totalAttendanceRate / cls.students.length)
         : 0,
       bestPerformingStudent: bestStudent,
@@ -212,7 +267,7 @@ exports.addStudentToClass = async (req, res) => {
     }
 
     const { classId, studentId } = req.body;
-    
+
     const cls = await Classroom.findById(classId);
     const student = await User.findById(studentId);
 
@@ -262,7 +317,7 @@ exports.removeStudentFromClass = async (req, res) => {
     }
 
     const { classId, studentId } = req.body;
-    
+
     const cls = await Classroom.findById(classId);
     const student = await User.findById(studentId);
 
@@ -302,7 +357,7 @@ exports.getAvailableStudents = async (req, res) => {
     }
 
     const { search = '', classId } = req.query;
-    
+
     // Получаем всех учеников с поиском по имени
     const searchRegex = new RegExp(search, 'i');
     const students = await User.find({
@@ -314,14 +369,13 @@ exports.getAvailableStudents = async (req, res) => {
     const studentsWithClassInfo = await Promise.all(
       students.map(async (student) => {
         let currentClass = null;
-        
+
         if (student.classRooms && student.classRooms.length > 0) {
-          const cls = await Classroom.findById(student.classRooms[0]).select('name grade');
+          const cls = await Classroom.findById(student.classRooms[0]).select('name');
           if (cls) {
             currentClass = {
               _id: cls._id,
-              name: cls.name,
-              grade: cls.grade
+              name: cls.name
             };
           }
         }
@@ -351,7 +405,7 @@ exports.getAllTeachers = async (req, res) => {
     }
 
     const { search = '' } = req.query;
-    
+
     const searchRegex = new RegExp(search, 'i');
     const teachers = await User.find({
       role: 'teacher',
@@ -373,7 +427,7 @@ exports.getAllStudentsForClass = async (req, res) => {
     }
 
     const { search = '' } = req.query;
-    
+
     const searchRegex = new RegExp(search, 'i');
     const students = await User.find({
       role: 'student',
@@ -384,14 +438,13 @@ exports.getAllStudentsForClass = async (req, res) => {
     const studentsWithClassInfo = await Promise.all(
       students.map(async (student) => {
         let currentClass = null;
-        
+
         if (student.classRooms && student.classRooms.length > 0) {
-          const cls = await Classroom.findById(student.classRooms[0]).select('name grade');
+          const cls = await Classroom.findById(student.classRooms[0]).select('name');
           if (cls) {
             currentClass = {
               _id: cls._id,
-              name: cls.name,
-              grade: cls.grade
+              name: cls.name
             };
           }
         }

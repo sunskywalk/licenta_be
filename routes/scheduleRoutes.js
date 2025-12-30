@@ -10,6 +10,12 @@ router.post('/', protect, checkRole(['admin']), scheduleController.createSchedul
 // получить все
 router.get('/', protect, scheduleController.getAllSchedules);
 
+// получить текущий учебный год, семестр и неделю
+router.get('/current-week', protect, scheduleController.getCurrentAcademicInfo);
+
+// получить даты для конкретной недели семестра
+router.get('/week-dates/:semester/:week', protect, scheduleController.getWeekDates);
+
 // получить расписание для конкретного учителя
 router.get('/teacher/:teacherId', protect, checkRole(['teacher', 'admin']), scheduleController.getTeacherSchedule);
 

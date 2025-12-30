@@ -4,33 +4,34 @@ const Classroom = require('../models/Classroom');
 const User = require('../models/User');
 const Grade = require('../models/Grade');
 const Homework = require('../models/Homework');
+const academicConfig = require('../config/academicConfig');
 
 // Функция проверки конфликтов расписания
 const checkScheduleConflicts = async (classId, dayOfWeek, periods, excludeScheduleId = null) => {
   const conflicts = [];
-  
+
   // Получаем все расписания для данного дня недели
   const existingSchedules = await Schedule.find({
     dayOfWeek: dayOfWeek,
     ...(excludeScheduleId && { _id: { $ne: excludeScheduleId } })
   }).populate('classId', 'name').populate('periods.teacherId', 'name');
-  
+
   // Проверяем каждый период нового расписания
   for (const newPeriod of periods) {
     const newStartTime = newPeriod.startTime;
     const newEndTime = newPeriod.endTime;
     const newTeacherId = newPeriod.teacherId;
-    
+
     // Проверяем конфликты с существующими расписаниями
     for (const existingSchedule of existingSchedules) {
       for (const existingPeriod of existingSchedule.periods) {
         const existingStartTime = existingPeriod.startTime;
         const existingEndTime = existingPeriod.endTime;
         const existingTeacherId = existingPeriod.teacherId._id;
-        
+
         // Проверяем пересечение временных интервалов
         const timesOverlap = (newStartTime < existingEndTime && newEndTime > existingStartTime);
-        
+
         if (timesOverlap) {
           // Конфликт учителя - один учитель в разных классах в одно время
           if (newTeacherId.toString() === existingTeacherId.toString()) {
@@ -43,7 +44,7 @@ const checkScheduleConflicts = async (classId, dayOfWeek, periods, excludeSchedu
               subject: existingPeriod.subject
             });
           }
-          
+
           // Конфликт класса - один класс не может иметь два урока одновременно
           if (classId.toString() === existingSchedule.classId._id.toString()) {
             conflicts.push({
@@ -58,24 +59,24 @@ const checkScheduleConflicts = async (classId, dayOfWeek, periods, excludeSchedu
       }
     }
   }
-  
+
   return conflicts;
 };
 
 exports.createSchedule = async (req, res) => {
   try {
     const { classId, dayOfWeek, week, semester, year, periods } = req.body;
-    
+
     // Проверяем конфликты перед созданием
     const conflicts = await checkScheduleConflicts(classId, dayOfWeek, periods);
-    
+
     if (conflicts.length > 0) {
       return res.status(409).json({
         message: 'Конфликт расписания! Расписание не может быть создано.',
         conflicts: conflicts
       });
     }
-    
+
     const schedule = await Schedule.create({
       classId,
       dayOfWeek,
@@ -84,14 +85,14 @@ exports.createSchedule = async (req, res) => {
       year,
       periods,
     });
-    
+
     const populatedSchedule = await Schedule.findById(schedule._id)
       .populate('classId')
       .populate('periods.teacherId', '-password');
-    
+
     // Сортируем периоды по времени
     populatedSchedule.periods.sort((a, b) => a.startTime.localeCompare(b.startTime));
-      
+
     res.status(201).json({ message: 'Расписание создано', schedule: populatedSchedule });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -109,12 +110,12 @@ exports.getAllSchedules = async (req, res) => {
         }
       })
       .populate('periods.teacherId', 'name email');
-    
+
     // Сортируем периоды по времени для каждого расписания
     schedules.forEach(schedule => {
       schedule.periods.sort((a, b) => a.startTime.localeCompare(b.startTime));
     });
-    
+
     res.json(schedules);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -129,10 +130,10 @@ exports.getScheduleById = async (req, res) => {
     if (!schedule) {
       return res.status(404).json({ message: 'Не найдено' });
     }
-    
+
     // Сортируем периоды по времени
     schedule.periods.sort((a, b) => a.startTime.localeCompare(b.startTime));
-    
+
     res.json(schedule);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -147,14 +148,14 @@ exports.updateSchedule = async (req, res) => {
       { classId, dayOfWeek, week, semester, year, periods },
       { new: true }
     ).populate('classId').populate('periods.teacherId', '-password');
-    
+
     if (!updated) {
       return res.status(404).json({ message: 'Не найдено' });
     }
-    
+
     // Сортируем периоды по времени
     updated.periods.sort((a, b) => a.startTime.localeCompare(b.startTime));
-    
+
     res.json({ message: 'Расписание обновлено', schedule: updated });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -179,12 +180,12 @@ exports.deleteSchedule = async (req, res) => {
 exports.getTeacherSchedule = async (req, res) => {
   try {
     const { teacherId } = req.params;
-    
+
     // Учитель может видеть только свое расписание
     if (req.user.role === 'teacher' && req.user.userId !== teacherId) {
       return res.status(403).json({ message: 'Нет прав' });
     }
-    
+
     // Найти все расписания, где учитель ведет уроки
     const schedules = await Schedule.find({ 'periods.teacherId': teacherId })
       .populate({
@@ -223,7 +224,7 @@ exports.getTeacherSchedule = async (req, res) => {
 exports.getScheduleByClass = async (req, res) => {
   try {
     const { classId } = req.params;
-    
+
     const schedules = await Schedule.find({ classId })
       .populate({
         path: 'classId',
@@ -252,7 +253,7 @@ exports.getScheduleByClass = async (req, res) => {
 exports.getScheduleByDay = async (req, res) => {
   try {
     const { dayOfWeek } = req.params;
-    
+
     const schedules = await Schedule.find({ dayOfWeek: parseInt(dayOfWeek) })
       .populate({
         path: 'classId',
@@ -279,22 +280,22 @@ exports.getScheduleByDay = async (req, res) => {
 exports.getStudentLessonDetails = async (req, res) => {
   try {
     const { studentId, subject, date } = req.params;
-    
+
     console.log(`📚 Fetching lesson details for student: ${studentId}, subject: ${subject}, date: ${date}`);
-    
+
     // Парсим дату
     const lessonDate = new Date(date);
     const startOfDay = new Date(lessonDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(lessonDate);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     // Получаем студента и его класс
     const student = await User.findById(studentId);
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
-    
+
     // Получаем оценки за этот урок
     const grades = await Grade.find({
       student: studentId,
@@ -304,28 +305,28 @@ exports.getStudentLessonDetails = async (req, res) => {
         $lte: endOfDay
       }
     }).sort({ createdAt: -1 });
-    
+
     // Получаем домашние задания по предмету (активные на эту дату)
     const homework = await Homework.find({
       subject: subject,
       $or: [
         { dueDate: { $gte: startOfDay, $lte: endOfDay } }, // Задания на сегодня
-        { 
+        {
           createdAt: { $lte: endOfDay },
           dueDate: { $gte: lessonDate } // Активные задания
         }
       ]
     }).sort({ createdAt: -1 }).limit(3);
-    
+
     // Получаем последний комментарий учителя по этому предмету
     const recentGradeWithComment = await Grade.findOne({
       student: studentId,
       subject: subject,
       comment: { $exists: true, $ne: '' }
     }).sort({ createdAt: -1 });
-    
+
     console.log(`📊 Found ${grades.length} grades, ${homework.length} homework, comment: ${recentGradeWithComment?.comment || 'none'}`);
-    
+
     res.json({
       subject: subject,
       date: date,
@@ -346,9 +347,65 @@ exports.getStudentLessonDetails = async (req, res) => {
       teacherComment: recentGradeWithComment?.comment || null,
       lastCommentDate: recentGradeWithComment?.createdAt || null
     });
-    
+
   } catch (error) {
     console.error('Error fetching lesson details:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get current academic year, semester, and week
+// @route   GET /api/schedule/current-week
+// @access  Private
+exports.getCurrentAcademicInfo = async (req, res) => {
+  try {
+    const info = academicConfig.getCurrentWeekAndSemester();
+    const config = academicConfig.getAcademicYearConfig();
+
+    res.json({
+      ...info,
+      academicYearLabel: `${config.academicYear}-${config.academicYear + 1}`,
+      semester1: {
+        start: config.semester1.start.toISOString().split('T')[0],
+        end: config.semester1.end.toISOString().split('T')[0],
+      },
+      semester2: {
+        start: config.semester2.start.toISOString().split('T')[0],
+        end: config.semester2.end.toISOString().split('T')[0],
+      },
+    });
+  } catch (error) {
+    console.error('Error getting academic info:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get dates for a specific week in a semester
+// @route   GET /api/schedule/week-dates/:semester/:week
+// @access  Private
+exports.getWeekDates = async (req, res) => {
+  try {
+    const { semester, week } = req.params;
+    const semesterNum = parseInt(semester);
+    const weekNum = parseInt(week);
+
+    if (![1, 2].includes(semesterNum) || weekNum < 1 || weekNum > 16) {
+      return res.status(400).json({
+        message: 'Invalid semester or week. Semester must be 1 or 2, week must be 1-16'
+      });
+    }
+
+    const dates = academicConfig.getWeekDates(semesterNum, weekNum);
+    const weekStart = academicConfig.getWeekStartDate(semesterNum, weekNum);
+
+    res.json({
+      semester: semesterNum,
+      week: weekNum,
+      weekStartDate: weekStart.toISOString().split('T')[0],
+      dates,
+    });
+  } catch (error) {
+    console.error('Error getting week dates:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

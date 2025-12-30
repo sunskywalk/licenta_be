@@ -22,6 +22,12 @@ const classroomSchema = new mongoose.Schema({
       ref: 'User',
     },
   ],
+  // Классный руководитель (может видеть всю статистику класса)
+  homeroomTeacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

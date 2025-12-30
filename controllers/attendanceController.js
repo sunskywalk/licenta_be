@@ -15,31 +15,41 @@ exports.markAttendance = async (req, res) => {
   }
 
   try {
+    // Проверяем, что учитель может отмечать посещаемость по этому предмету
+    if (req.user.role === 'teacher') {
+      const teacherUser = await User.findById(req.user.userId);
+      if (!teacherUser.subjects || !teacherUser.subjects.includes(subject)) {
+        return res.status(403).json({
+          message: `Вы не можете отмечать посещаемость по предмету "${subject}"`
+        });
+      }
+    }
+
     console.log('📝 Marking attendance:', { student, classId, subject, date, status, teacher });
-    
-    
+
+
     const attendanceDate = new Date(date);
-    attendanceDate.setHours(0, 0, 0, 0); 
-    
-    
-    const basicSearchCondition = { 
-      student, 
-      classId, 
-      subject, 
+    attendanceDate.setHours(0, 0, 0, 0);
+
+
+    const basicSearchCondition = {
+      student,
+      classId,
+      subject,
       date: attendanceDate
     };
-    
+
     console.log('🔍 Basic search condition:', basicSearchCondition);
-    
-   
+
+
     let existingAttendance = await Attendance.findOne(basicSearchCondition);
-    
-    
+
+
     if (existingAttendance && String(existingAttendance.teacher) !== String(teacher)) {
       console.log('⚠️ Found attendance from different teacher:', existingAttendance.teacher, 'vs', teacher);
       existingAttendance = null; // Создадим новую запись
     }
-    
+
     let attendance;
     if (existingAttendance) {
       // Обновляем существующую запись
@@ -61,7 +71,7 @@ exports.markAttendance = async (req, res) => {
         teacher
       });
     }
-    
+
     console.log('✅ Attendance marked successfully:', attendance);
     res.status(201).json(attendance);
   } catch (error) {
@@ -77,15 +87,15 @@ exports.getAttendanceByClassAndDate = async (req, res) => {
   try {
     const { classId, date } = req.params;
     console.log('📊 Fetching attendance for class:', classId, 'date:', date);
-    
+
     // Конвертируем дату в правильный формат
     const attendanceDate = new Date(date);
     attendanceDate.setHours(0, 0, 0, 0); // Убираем время, оставляем только дату
-    
+
     const attendance = await Attendance.find({ classId, date: attendanceDate })
       .populate('student', 'name')
       .populate('teacher', 'name');
-    
+
     console.log('📋 Found attendance records:', attendance.length);
     res.json(attendance);
   } catch (error) {
@@ -178,21 +188,21 @@ exports.deleteAttendance = async (req, res) => {
 // @route   GET /api/attendance/student/:studentId
 // @access  Private
 exports.getStudentAttendance = async (req, res) => {
-    try {
-        const studentId = req.params.studentId;
-        console.log('📊 Fetching attendance for student:', studentId);
-        
-        const attendance = await Attendance.find({ student: studentId })
-            .populate('classId', 'name')
-            .populate('teacher', 'name')
-            .sort({ date: -1 }); // Сортировка по дате (новые сначала)
-        
-        console.log('📋 Found attendance records for student:', attendance.length);
-        res.json(attendance);
-    } catch (error) {
-        console.error('❌ Error fetching student attendance:', error);
-        res.status(500).json({ message: 'Ошибка сервера', error: error.message });
-    }
+  try {
+    const studentId = req.params.studentId;
+    console.log('📊 Fetching attendance for student:', studentId);
+
+    const attendance = await Attendance.find({ student: studentId })
+      .populate('classId', 'name')
+      .populate('teacher', 'name')
+      .sort({ date: -1 }); // Сортировка по дате (новые сначала)
+
+    console.log('📋 Found attendance records for student:', attendance.length);
+    res.json(attendance);
+  } catch (error) {
+    console.error('❌ Error fetching student attendance:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: error.message });
+  }
 };
 
 // @desc    Get attendance stats for a specific student
@@ -202,11 +212,11 @@ exports.getStudentAttendanceStats = async (req, res) => {
   try {
     const studentId = req.params.studentId;
     const { period } = req.query; // 'current_month', 'current_semester', 'all'
-    
+
     console.log('📊 Calculating attendance stats for student:', studentId, 'period:', period);
-    
+
     let dateFilter = {};
-    
+
     // Определяем период для расчета статистики
     if (period === 'current_month') {
       const now = new Date();
@@ -223,19 +233,19 @@ exports.getStudentAttendanceStats = async (req, res) => {
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       dateFilter = { date: { $gte: thirtyDaysAgo } };
     }
-    
+
     const filter = { student: studentId, ...dateFilter };
     console.log('📅 Using filter:', filter);
-    
+
     const attendance = await Attendance.find(filter).sort({ date: -1 });
-    
+
     const total = attendance.length;
     const present = attendance.filter(a => a.status === 'present').length;
     const absent = attendance.filter(a => a.status === 'absent').length;
     const late = attendance.filter(a => a.status === 'late').length;
     const excused = attendance.filter(a => a.status === 'excused').length;
     const attendanceRate = total > 0 ? Math.round((present / total) * 100) : 0;
-    
+
     const stats = {
       total,
       totalPresent: present, // Изменено для совместимости с frontend
@@ -246,7 +256,7 @@ exports.getStudentAttendanceStats = async (req, res) => {
       attendanceRate,
       period: period || 'last_30_days'
     };
-    
+
     console.log('📈 Attendance stats:', stats);
     res.json(stats);
   } catch (error) {
@@ -264,18 +274,18 @@ exports.getTeacherAttendance = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Необходима аутентификация' });
     }
-    
+
     const { teacherId } = req.params;
-    
+
     // Учитель может видеть только свои записи
     if (req.user.role === 'teacher' && req.user.userId !== teacherId) {
       return res.status(403).json({ message: 'Нет прав' });
     }
-    
+
     const records = await Attendance.find({ teacher: teacherId })
       .populate('student', '-password')
       .populate('classId');
-      
+
     res.json(records);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка', error: error.message });
@@ -289,14 +299,14 @@ exports.getClassAttendanceStats = async (req, res) => {
   try {
     const { classId } = req.params;
     const attendance = await Attendance.find({ classId });
-    
+
     const total = attendance.length;
     const present = attendance.filter(a => a.status === 'present').length;
     const absent = attendance.filter(a => a.status === 'absent').length;
     const late = attendance.filter(a => a.status === 'late').length;
     const excused = attendance.filter(a => a.status === 'excused').length;
     const attendanceRate = total > 0 ? Math.round((present / total) * 100) : 0;
-    
+
     res.json({ total, present, absent, late, excused, attendanceRate });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка сервера', error: error.message });
@@ -313,7 +323,7 @@ exports.getAttendanceByClass = async (req, res) => {
       .populate('student', 'name')
       .populate('teacher', 'name')
       .sort({ date: -1 });
-    
+
     res.json(attendance);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка сервера', error: error.message });
@@ -331,7 +341,7 @@ exports.getAttendanceByDate = async (req, res) => {
       .populate('classId', 'name')
       .populate('teacher', 'name')
       .sort({ classId: 1 });
-    
+
     res.json(attendance);
   } catch (error) {
     res.status(500).json({ message: 'Ошибка сервера', error: error.message });
@@ -344,16 +354,16 @@ exports.getAttendanceByDate = async (req, res) => {
 exports.createBulkAttendance = async (req, res) => {
   try {
     const attendanceRecords = req.body;
-    
+
     if (!Array.isArray(attendanceRecords)) {
       return res.status(400).json({ message: 'Ожидается массив записей посещаемости' });
     }
-    
+
     const createdRecords = await Attendance.insertMany(attendanceRecords);
-    res.status(201).json({ 
-      message: 'Записи посещаемости созданы', 
+    res.status(201).json({
+      message: 'Записи посещаемости созданы',
       count: createdRecords.length,
-      records: createdRecords 
+      records: createdRecords
     });
   } catch (error) {
     res.status(500).json({ message: 'Ошибка создания записей', error: error.message });
@@ -364,45 +374,45 @@ exports.createBulkAttendance = async (req, res) => {
 // @route   GET /api/attendance/student/:studentId/with-grades
 // @access  Private
 exports.getStudentAttendanceWithGrades = async (req, res) => {
-    try {
-        const studentId = req.params.studentId;
-        console.log('📊 Fetching attendance with grades for student:', studentId);
-        
-        const attendance = await Attendance.find({ student: studentId })
-            .populate('classId', 'name')
-            .populate('teacher', 'name')
-            .sort({ date: -1 });
-        
-        // Получаем оценки студента
-        const grades = await Grade.find({ student: studentId })
-            .sort({ date: -1 });
-        
-        // Объединяем данные посещаемости с оценками
-        const attendanceWithGrades = attendance.map(att => {
-            // Ищем оценку за тот же день и предмет
-            const matchingGrade = grades.find(grade => {
-                const gradeDate = new Date(grade.date);
-                const attDate = new Date(att.date);
-                return (
-                    gradeDate.toDateString() === attDate.toDateString() &&
-                    grade.subject === att.subject
-                );
-            });
-            
-            return {
-                ...att.toObject(),
-                grade: matchingGrade ? {
-                    value: matchingGrade.value,
-                    type: matchingGrade.type,
-                    comment: matchingGrade.comment
-                } : null
-            };
-        });
-        
-        console.log('📋 Found attendance with grades:', attendanceWithGrades.length);
-        res.json(attendanceWithGrades);
-    } catch (error) {
-        console.error('❌ Error fetching student attendance with grades:', error);
-        res.status(500).json({ message: 'Ошибка сервера', error: error.message });
+  try {
+    const studentId = req.params.studentId;
+    console.log('📊 Fetching attendance with grades for student:', studentId);
+
+    const attendance = await Attendance.find({ student: studentId })
+      .populate('classId', 'name')
+      .populate('teacher', 'name')
+      .sort({ date: -1 });
+
+    // Получаем оценки студента
+    const grades = await Grade.find({ student: studentId })
+      .sort({ createdAt: -1 });
+
+    // Объединяем данные посещаемости с оценками
+    const attendanceWithGrades = attendance.map(att => {
+      // Ищем оценку за тот же день и предмет
+      const matchingGrade = grades.find(grade => {
+        const gradeDate = new Date(grade.createdAt);
+        const attDate = new Date(att.date);
+        return (
+          gradeDate.toDateString() === attDate.toDateString() &&
+          grade.subject === att.subject
+        );
+      });
+
+      return {
+        ...att.toObject(),
+        grade: matchingGrade ? {
+          value: matchingGrade.value,
+          type: matchingGrade.type,
+          comment: matchingGrade.comment
+        } : null
+      };
+    });
+
+    console.log('📋 Found attendance with grades:', attendanceWithGrades.length);
+    res.json(attendanceWithGrades);
+  } catch (error) {
+    console.error('❌ Error fetching student attendance with grades:', error);
+    res.status(500).json({ message: 'Ошибка сервера', error: error.message });
   }
 };
