@@ -370,13 +370,40 @@ exports.getClassroomsForSubject = async (req, res) => {
     console.log('[getClassroomsForSubject] Found classIds:', classIds);
 
     // Получаем информацию о классах с populate студентов
-    const Classroom = require('../models/Classroom');
     const classrooms = await Classroom.find({ _id: { $in: classIds } })
       .populate('students', '-password')
-      .populate('teachers', '-password');
-    console.log('[getClassroomsForSubject] Found classrooms:', classrooms.map(c => `${c.name} (${c.students?.length || 0} students)`));
+      .populate('teachers', '-password')
+      .populate('homeroomTeacher', '-password');
 
-    res.json(classrooms);
+    // Добавляем флаг isHomeroom для классов, где учитель является классным руководителем
+    const classroomsWithFlags = classrooms.map(classroom => {
+      const classroomObj = classroom.toObject();
+      classroomObj.isHomeroom = classroom.homeroomTeacher &&
+        classroom.homeroomTeacher._id.toString() === teacherId.toString();
+      return classroomObj;
+    });
+
+    // Также получаем класс, где учитель является классным руководителем (если еще не в списке)
+    const homeroomClass = await Classroom.findOne({ homeroomTeacher: teacherId })
+      .populate('students', '-password')
+      .populate('teachers', '-password')
+      .populate('homeroomTeacher', '-password');
+
+    if (homeroomClass) {
+      // Проверяем, нет ли его уже в списке
+      const existsInList = classrooms.some(c => c._id.toString() === homeroomClass._id.toString());
+      if (!existsInList) {
+        const homeroomObj = homeroomClass.toObject();
+        homeroomObj.isHomeroom = true;
+        homeroomObj.isHomeroomOnly = true; // Флаг что это ТОЛЬКО класс руководителя, не предмет
+        classroomsWithFlags.push(homeroomObj);
+      }
+    }
+
+    console.log('[getClassroomsForSubject] Returning classrooms:',
+      classroomsWithFlags.map(c => `${c.name} (homeroom: ${c.isHomeroom}, homeroomOnly: ${c.isHomeroomOnly || false})`));
+
+    res.json(classroomsWithFlags);
   } catch (error) {
     console.error('Error in getClassroomsForSubject:', error);
     res.status(500).json({ message: 'Ошибка', error: error.message });
