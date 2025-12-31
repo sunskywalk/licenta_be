@@ -3,6 +3,7 @@ const Grade = require('../models/Grade');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const Classroom = require('../models/Classroom');
+const Schedule = require('../models/Schedule');
 
 exports.createGrade = async (req, res) => {
   try {
@@ -409,6 +410,72 @@ exports.getClassroomsForSubject = async (req, res) => {
     res.status(500).json({ message: 'Ошибка', error: error.message });
   }
 };
+
+// ============================
+// Получение ВСЕХ классов учителя (независимо от предмета)
+// ============================
+exports.getAllTeacherClasses = async (req, res) => {
+  try {
+    const teacherId = req.user.userId;
+    console.log('[getAllTeacherClasses] teacherId:', teacherId);
+
+    // Получаем все расписания где учитель ведет уроки
+    const schedules = await Schedule.find({}).populate('classId');
+    console.log('[getAllTeacherClasses] Total schedules in DB:', schedules.length);
+
+    // Фильтруем расписания где есть хотя бы один период с этим учителем
+    const teacherSchedules = schedules.filter(schedule =>
+      schedule.periods && schedule.periods.some(period =>
+        period.teacherId && period.teacherId.toString() === teacherId.toString()
+      )
+    );
+    console.log('[getAllTeacherClasses] Schedules with this teacher:', teacherSchedules.length);
+
+    // Извлекаем уникальные classId
+    const classIds = [...new Set(teacherSchedules.map(s => s.classId._id.toString()))];
+    console.log('[getAllTeacherClasses] Found classIds from schedule:', classIds);
+
+
+    // Получаем информацию о классах с populate студентов
+    const classrooms = await Classroom.find({ _id: { $in: classIds } })
+      .populate('students', '-password')
+      .populate('teachers', '-password')
+      .populate('homeroomTeacher', '-password');
+
+    // Добавляем флаг isHomeroom для классов, где учитель является классным руководителем
+    const classroomsWithFlags = classrooms.map(classroom => {
+      const classroomObj = classroom.toObject();
+      classroomObj.isHomeroom = classroom.homeroomTeacher &&
+        classroom.homeroomTeacher._id.toString() === teacherId.toString();
+      return classroomObj;
+    });
+
+    // Также получаем класс, где учитель является классным руководителем (если еще не в списке)
+    const homeroomClass = await Classroom.findOne({ homeroomTeacher: teacherId })
+      .populate('students', '-password')
+      .populate('teachers', '-password')
+      .populate('homeroomTeacher', '-password');
+
+    if (homeroomClass) {
+      // Проверяем, нет ли его уже в списке
+      const existsInList = classrooms.some(c => c._id.toString() === homeroomClass._id.toString());
+      if (!existsInList) {
+        const homeroomObj = homeroomClass.toObject();
+        homeroomObj.isHomeroom = true;
+        classroomsWithFlags.push(homeroomObj);
+      }
+    }
+
+    console.log('[getAllTeacherClasses] Returning classrooms:',
+      classroomsWithFlags.map(c => `${c.name} (homeroom: ${c.isHomeroom})`));
+
+    res.json(classroomsWithFlags);
+  } catch (error) {
+    console.error('Error in getAllTeacherClasses:', error);
+    res.status(500).json({ message: 'Ошибка', error: error.message });
+  }
+};
+
 
 // Получить статистику оценок студента
 exports.getStudentGradeStats = async (req, res) => {

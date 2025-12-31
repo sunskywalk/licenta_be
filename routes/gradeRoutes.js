@@ -7,6 +7,7 @@ const { protect } = require('../middleware/authMiddleware');
 // Методы для получения предметов и классов учителя (ДОЛЖНЫ БЫТЬ ПЕРВЫМИ!)
 router.get('/my-subjects', protect, gradeController.getTeacherSubjects);
 router.get('/my-subjects/:subject/classes', protect, gradeController.getClassroomsForSubject);
+router.get('/my-classes', protect, gradeController.getAllTeacherClasses);
 
 // Методы для расчётов
 router.get('/student/:studentId/average', protect, gradeController.getStudentAverage);
