@@ -6,8 +6,8 @@
 require('dotenv').config();                           // .env -> process.env
 console.log('[DEBUG] dotenv loaded');
 
-const express   = require('express');
-const cors      = require('cors');
+const express = require('express');
+const cors = require('cors');
 const connectDB = require('./config/db');             // ДОЛЖНА возвращать Promise!
 
 console.log('[DEBUG] libs imported');
@@ -23,14 +23,15 @@ console.log('[DEBUG] middleware registered');
 app.get('/api/ping', (_, res) => res.send('pong'));
 
 // ────────────────────── Основные роуты ──────────────────
-app.use('/api/users',        require('./routes/userRoutes'));
-app.use('/api/classes',      require('./routes/classRoutes'));
-app.use('/api/schedule',     require('./routes/scheduleRoutes'));
-app.use('/api/grades',       require('./routes/gradeRoutes'));
-app.use('/api/attendance',   require('./routes/attendanceRoutes'));
-app.use('/api/homeworks',    require('./routes/homeworkRoutes'));
-app.use('/api/notifications',require('./routes/notificationRoutes'));
-app.use('/api/stats',        require('./routes/statsRoutes'));
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/classes', require('./routes/classRoutes'));
+app.use('/api/schedule', require('./routes/scheduleRoutes'));
+app.use('/api/grades', require('./routes/gradeRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/homeworks', require('./routes/homeworkRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/stats', require('./routes/statsRoutes'));
+app.use('/api/school-events', require('./routes/schoolEventRoutes'));
 
 const PORT = process.env.PORT || 3000;
 

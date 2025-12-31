@@ -28,6 +28,9 @@ router.get('/student/:studentId/lesson/:subject/:date', protect, scheduleControl
 // получить расписание для конкретного дня недели
 router.get('/day/:dayOfWeek', protect, scheduleController.getScheduleByDay);
 
+// получить расписание с событиями для конкретной даты
+router.get('/with-events/:userId/:date', protect, scheduleController.getScheduleWithEvents);
+
 // получить одно
 router.get('/:id', protect, scheduleController.getScheduleById);
 

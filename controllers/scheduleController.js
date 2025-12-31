@@ -271,8 +271,184 @@ exports.getScheduleByDay = async (req, res) => {
 
     res.json(schedules);
   } catch (error) {
-    console.error('Error fetching day schedule:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error getting week dates:', error);
+    res.status(500).json({ message: 'Ошибка при получении дат недели', error: error.message });
+  }
+};
+
+// ============================
+// Get schedule with events for a specific date
+// ============================
+exports.getScheduleWithEvents = async (req, res) => {
+  try {
+    const { userId, date } = req.params;
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    console.log('[getScheduleWithEvents] userId:', userId, 'date:', date);
+
+    // Get user to determine role
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Get day of week (0 = Sunday, 1 = Monday, etc.)
+    const dayOfWeek = checkDate.getDay();
+
+    // Import SchoolEvent model
+    const SchoolEvent = require('../models/SchoolEvent');
+
+    // Check for school events on this date
+    const endOfDay = new Date(checkDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const events = await SchoolEvent.find({
+      startDate: { $lte: endOfDay },
+      endDate: { $gte: checkDate },
+    }).populate('classId', 'name');
+
+    console.log('[getScheduleWithEvents] Found events:', events.length);
+
+    // Determine which events apply to this user
+    let applicableEvent = null;
+    let userClassId = null;
+
+    if (user.role === 'student') {
+      userClassId = user.classRooms;
+    }
+
+    // Check for school-wide events first (vacation, holiday)
+    const schoolWideEvent = events.find(e =>
+      e.affectsAllSchool && (e.type === 'vacation' || e.type === 'holiday')
+    );
+
+    if (schoolWideEvent) {
+      applicableEvent = schoolWideEvent;
+    } else if (userClassId) {
+      // Check for class-specific events
+      const classEvent = events.find(e =>
+        !e.affectsAllSchool && e.classId && e.classId._id.toString() === userClassId.toString()
+      );
+      if (classEvent) {
+        applicableEvent = classEvent;
+      }
+    }
+
+    // Check for shortened day (school-wide)
+    const shortenedDayEvent = events.find(e =>
+      e.affectsAllSchool && e.type === 'shortened_day'
+    );
+
+    // Get schedule for this day
+    let schedule = null;
+    let lessons = [];
+
+    if (user.role === 'student' && userClassId) {
+      schedule = await Schedule.findOne({
+        classId: userClassId,
+        dayOfWeek: dayOfWeek,
+      }).populate('periods.teacherId', 'name email');
+
+      if (schedule) {
+        lessons = schedule.periods.map(period => ({
+          subject: period.subject,
+          teacher: period.teacherId ? period.teacherId.name : 'Unknown',
+          teacherId: period.teacherId ? period.teacherId._id : null,
+          startTime: period.startTime,
+          endTime: period.endTime,
+          room: period.room,
+          status: 'normal',
+        }));
+      }
+    } else if (user.role === 'teacher') {
+      // Get all schedules where this teacher teaches
+      const schedules = await Schedule.find({
+        dayOfWeek: dayOfWeek,
+        'periods.teacherId': userId,
+      }).populate('classId', 'name');
+
+      lessons = [];
+      for (const sched of schedules) {
+        for (const period of sched.periods) {
+          if (period.teacherId && period.teacherId.toString() === userId) {
+            lessons.push({
+              subject: period.subject,
+              className: sched.classId.name,
+              classId: sched.classId._id,
+              startTime: period.startTime,
+              endTime: period.endTime,
+              room: period.room,
+              status: 'normal',
+            });
+          }
+        }
+      }
+    }
+
+    // Apply event logic
+    let responseData = {
+      date: checkDate.toISOString().split('T')[0],
+      dayOfWeek: dayOfWeek,
+      eventType: 'normal',
+      eventName: null,
+      lessons: lessons,
+    };
+
+    // If vacation or holiday, return event info with no lessons
+    if (applicableEvent && (applicableEvent.type === 'vacation' || applicableEvent.type === 'holiday')) {
+      responseData.eventType = applicableEvent.type;
+      responseData.eventName = applicableEvent.name;
+      responseData.lessons = [];
+    }
+    // If class exception, mark affected lessons as cancelled
+    else if (applicableEvent && applicableEvent.type === 'class_exception') {
+      responseData.eventType = 'class_exception';
+      responseData.eventName = applicableEvent.name;
+
+      if (user.role === 'student') {
+        // All lessons cancelled for student
+        responseData.lessons = [];
+      } else if (user.role === 'teacher') {
+        // Mark lessons for this specific class as cancelled
+        responseData.lessons = lessons.map(lesson => {
+          if (lesson.classId && lesson.classId.toString() === applicableEvent.classId._id.toString()) {
+            return { ...lesson, status: 'cancelled' };
+          }
+          return lesson;
+        });
+      }
+    }
+    // If shortened day, adjust times
+    else if (shortenedDayEvent) {
+      responseData.eventType = 'shortened_day';
+      responseData.eventName = shortenedDayEvent.name;
+
+      const lessonDuration = shortenedDayEvent.shortenedSchedule?.lessonDuration || 30;
+      const breakDuration = shortenedDayEvent.shortenedSchedule?.breakDuration || 5;
+
+      // Recalculate times
+      responseData.lessons = lessons.map((lesson, index) => {
+        const startMinutes = 480 + index * (lessonDuration + breakDuration); // Start at 8:00 AM
+        const endMinutes = startMinutes + lessonDuration;
+
+        const startHours = Math.floor(startMinutes / 60);
+        const startMins = startMinutes % 60;
+        const endHours = Math.floor(endMinutes / 60);
+        const endMins = endMinutes % 60;
+
+        return {
+          ...lesson,
+          startTime: `${String(startHours).padStart(2, '0')}:${String(startMins).padStart(2, '0')}`,
+          endTime: `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`,
+        };
+      });
+    }
+
+    res.json(responseData);
+  } catch (error) {
+    console.error('Error getting schedule with events:', error);
+    res.status(500).json({ message: 'Ошибка при получении расписания', error: error.message });
   }
 };
 

@@ -48,16 +48,25 @@ exports.protect = (req, res, next) => {
  * Ограничение по ролям.
  * Пример: router.post('/admin', protect, checkRole(['admin']), adminController);
  */
-exports.checkRole = (allowedRoles = []) => (req, res, next) => {
-  if (!req.user || !allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ message: 'Недостаточно прав' });
-  }
-  return next();
+exports.checkRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !req.user.role) {
+      return res.status(403).json({ message: 'Доступ запрещён: роль не определена' });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: `Доступ запрещён: требуется роль ${allowedRoles.join(' или ')}`,
+      });
+    }
+
+    return next();
+  };
 };
 
 /**
- * Middleware только для админов.
- * Пример: router.get('/stats', protect, adminOnly, statsController);
+ * Admin-only middleware
+ * Shorthand for checkRole(['admin'])
  */
 exports.adminOnly = (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
