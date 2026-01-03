@@ -1,14 +1,45 @@
 // models/Schedule.js
 const mongoose = require('mongoose');
 
+// Helper function to convert time string to minutes
+const timeToMinutes = (timeStr) => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
 const schedulePeriodSchema = new mongoose.Schema({
   startTime: {
     type: String,
     required: [true, 'Время начала обязательно'],
+    validate: {
+      validator: function (v) {
+        // Check format HH:mm (with leading zeros)
+        return /^([01]?\d|2[0-3]):([0-5]\d)$/.test(v);
+      },
+      message: 'Формат времени должен быть HH:mm (например, 09:00 или 14:30)'
+    }
   },
   endTime: {
     type: String,
     required: [true, 'Время окончания обязательно'],
+    validate: {
+      validator: function (v) {
+        // Check format HH:mm
+        if (!/^([01]?\d|2[0-3]):([0-5]\d)$/.test(v)) {
+          return false;
+        }
+
+        // Check that endTime > startTime
+        if (this.startTime) {
+          const startMinutes = timeToMinutes(this.startTime);
+          const endMinutes = timeToMinutes(v);
+          return endMinutes > startMinutes;
+        }
+
+        return true;
+      },
+      message: 'Время окончания должно быть позже времени начала и в формате HH:mm'
+    }
   },
   subject: {
     type: String,

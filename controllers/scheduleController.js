@@ -6,39 +6,65 @@ const Grade = require('../models/Grade');
 const Homework = require('../models/Homework');
 const academicConfig = require('../config/academicConfig');
 
+// Функция конвертации времени в минуты для корректного сравнения
+const timeToMinutes = (timeStr) => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
 // Функция проверки конфликтов расписания
-const checkScheduleConflicts = async (classId, dayOfWeek, periods, excludeScheduleId = null) => {
+const checkScheduleConflicts = async (
+  classId,
+  dayOfWeek,
+  week,
+  semester,
+  year,
+  periods,
+  excludeScheduleId = null
+) => {
   const conflicts = [];
 
-  // Получаем все расписания для данного дня недели
-  const existingSchedules = await Schedule.find({
+  // Получаем расписания ТОЛЬКО для конкретного дня/недели/семестра/года
+  const query = {
     dayOfWeek: dayOfWeek,
+    week: week,
+    semester: semester,
+    year: year,
     ...(excludeScheduleId && { _id: { $ne: excludeScheduleId } })
-  }).populate('classId', 'name').populate('periods.teacherId', 'name');
+  };
+
+  const existingSchedules = await Schedule.find(query)
+    .populate('classId', 'name')
+    .populate('periods.teacherId', 'name');
 
   // Проверяем каждый период нового расписания
   for (const newPeriod of periods) {
-    const newStartTime = newPeriod.startTime;
-    const newEndTime = newPeriod.endTime;
+    // Конвертируем в минуты для численного сравнения
+    const newStartMinutes = timeToMinutes(newPeriod.startTime);
+    const newEndMinutes = timeToMinutes(newPeriod.endTime);
     const newTeacherId = newPeriod.teacherId;
 
     // Проверяем конфликты с существующими расписаниями
     for (const existingSchedule of existingSchedules) {
       for (const existingPeriod of existingSchedule.periods) {
-        const existingStartTime = existingPeriod.startTime;
-        const existingEndTime = existingPeriod.endTime;
+        // Конвертируем существующее время в минуты
+        const existingStartMinutes = timeToMinutes(existingPeriod.startTime);
+        const existingEndMinutes = timeToMinutes(existingPeriod.endTime);
         const existingTeacherId = existingPeriod.teacherId._id;
 
-        // Проверяем пересечение временных интервалов
-        const timesOverlap = (newStartTime < existingEndTime && newEndTime > existingStartTime);
+        // Проверяем пересечение временных интервалов (численное сравнение)
+        const timesOverlap = (
+          newStartMinutes < existingEndMinutes &&
+          newEndMinutes > existingStartMinutes
+        );
 
         if (timesOverlap) {
           // Конфликт учителя - один учитель в разных классах в одно время
           if (newTeacherId.toString() === existingTeacherId.toString()) {
             conflicts.push({
               type: 'teacher_conflict',
-              message: `Учитель ${existingPeriod.teacherId.name} уже назначен на ${existingStartTime}-${existingEndTime} в классе ${existingSchedule.classId.name}`,
-              time: `${existingStartTime}-${existingEndTime}`,
+              message: `Учитель ${existingPeriod.teacherId.name} уже назначен на ${existingPeriod.startTime}-${existingPeriod.endTime} в классе ${existingSchedule.classId.name}`,
+              time: `${existingPeriod.startTime}-${existingPeriod.endTime}`,
               teacher: existingPeriod.teacherId.name,
               conflictClass: existingSchedule.classId.name,
               subject: existingPeriod.subject
@@ -49,8 +75,8 @@ const checkScheduleConflicts = async (classId, dayOfWeek, periods, excludeSchedu
           if (classId.toString() === existingSchedule.classId._id.toString()) {
             conflicts.push({
               type: 'class_conflict',
-              message: `Класс ${existingSchedule.classId.name} уже имеет урок ${existingPeriod.subject} в ${existingStartTime}-${existingEndTime}`,
-              time: `${existingStartTime}-${existingEndTime}`,
+              message: `Класс ${existingSchedule.classId.name} уже имеет урок ${existingPeriod.subject} в ${existingPeriod.startTime}-${existingPeriod.endTime}`,
+              time: `${existingPeriod.startTime}-${existingPeriod.endTime}`,
               class: existingSchedule.classId.name,
               conflictSubject: existingPeriod.subject
             });
@@ -67,8 +93,15 @@ exports.createSchedule = async (req, res) => {
   try {
     const { classId, dayOfWeek, week, semester, year, periods } = req.body;
 
-    // Проверяем конфликты перед созданием
-    const conflicts = await checkScheduleConflicts(classId, dayOfWeek, periods);
+    // Проверяем конфликты перед созданием (с новыми параметрами)
+    const conflicts = await checkScheduleConflicts(
+      classId,
+      dayOfWeek,
+      week,
+      semester,
+      year,
+      periods
+    );
 
     if (conflicts.length > 0) {
       return res.status(409).json({
@@ -143,10 +176,29 @@ exports.getScheduleById = async (req, res) => {
 exports.updateSchedule = async (req, res) => {
   try {
     const { classId, dayOfWeek, week, semester, year, periods } = req.body;
+
+    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем конфликты перед обновлением!
+    const conflicts = await checkScheduleConflicts(
+      classId,
+      dayOfWeek,
+      week,
+      semester,
+      year,
+      periods,
+      req.params.id // Исключаем текущее расписание из проверки
+    );
+
+    if (conflicts.length > 0) {
+      return res.status(409).json({
+        message: 'Конфликт расписания при обновлении!',
+        conflicts: conflicts
+      });
+    }
+
     const updated = await Schedule.findByIdAndUpdate(
       req.params.id,
       { classId, dayOfWeek, week, semester, year, periods },
-      { new: true }
+      { new: true, runValidators: true } // runValidators для проверки времени
     ).populate('classId').populate('periods.teacherId', '-password');
 
     if (!updated) {
