@@ -481,10 +481,16 @@ exports.getAllTeacherClasses = async (req, res) => {
 exports.getStudentGradeStats = async (req, res) => {
   try {
     const { studentId } = req.params;
+    const { year } = req.query; // Optional academic year filter
 
-    console.log(`📊 Fetching grade stats for student: ${studentId}`);
+    console.log(`📊 Fetching grade stats for student: ${studentId}${year ? `, year: ${year}` : ''}`);
 
     let filter = { student: studentId };
+
+    // Add academic year filter if provided
+    if (year) {
+      filter.academicYear = parseInt(year);
+    }
 
     // Проверка прав доступа для учителя и студента
     if (req.user.role === 'student' && String(req.user.userId) !== String(studentId)) {

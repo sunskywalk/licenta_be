@@ -82,9 +82,36 @@ const scheduleSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Год обязателен'],
   },
+
+  // ─────────────────────────────────────────────────────────
+  // Новые поля для гибкой системы Academic Year (опциональные)
+  // После настройки AcademicYear админом эти поля будут использоваться
+  // ─────────────────────────────────────────────────────────
+
+  // Ссылка на конфигурацию учебного года
+  academicYearId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicYear',
+    // НЕ required — позволяет постепенный переход
+  },
+
+  // Номер периода (1, 2, 3...) — привязка к periods[] в AcademicYear
+  periodNumber: {
+    type: Number,
+    min: 1,
+    // НЕ required — fallback на старое поле semester
+  },
+
   periods: [schedulePeriodSchema],
 }, {
   timestamps: true,
 });
+
+// Виртуальное поле для обратной совместимости
+scheduleSchema.virtual('effectivePeriodNumber').get(function () {
+  // Если есть новое поле — используем его, иначе старый semester
+  return this.periodNumber || this.semester;
+});
+
 
 module.exports = mongoose.model('Schedule', scheduleSchema);
