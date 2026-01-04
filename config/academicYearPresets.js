@@ -118,39 +118,38 @@ const generatePeriodsFromPreset = (presetType, yearStart, yearEnd) => {
         throw new Error(`Unknown preset: ${presetType}`);
     }
 
+    // Use exact dates from year - don't modify them
     const start = new Date(yearStart);
     const end = new Date(yearEnd);
 
-    // Normalize to UTC midnight to avoid timezone issues
-    start.setUTCHours(0, 0, 0, 0);
-    end.setUTCHours(23, 59, 59, 999);
-
-    const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    // Calculate total days in the year
+    const totalMs = end.getTime() - start.getTime();
+    const totalDays = Math.ceil(totalMs / (1000 * 60 * 60 * 24));
 
     const periods = [];
-    let currentDate = new Date(start);
+    let currentOffset = 0; // Days offset from start
 
     for (let i = 0; i < preset.periods.length; i++) {
         const periodTemplate = preset.periods[i];
         const isLastPeriod = (i === preset.periods.length - 1);
 
         // Calculate days for this period
-        let daysInPeriod = Math.floor(totalDays * periodTemplate.percentOfYear);
+        const daysInPeriod = Math.floor(totalDays * periodTemplate.percentOfYear);
 
-        const periodStart = new Date(currentDate);
-        periodStart.setUTCHours(0, 0, 0, 0);
+        // Period start: year start + offset days
+        const periodStart = new Date(start);
+        periodStart.setDate(periodStart.getDate() + currentOffset);
 
         let periodEnd;
-
         if (isLastPeriod) {
             // Last period always ends exactly at year end
             periodEnd = new Date(end);
         } else {
-            periodEnd = new Date(currentDate);
+            // Period end: periodStart + daysInPeriod - 1
+            periodEnd = new Date(periodStart);
             periodEnd.setDate(periodEnd.getDate() + daysInPeriod - 1);
-            periodEnd.setUTCHours(23, 59, 59, 999);
 
-            // Make sure we don't exceed year end
+            // Ensure we don't exceed year end
             if (periodEnd > end) {
                 periodEnd = new Date(end);
             }
@@ -164,9 +163,7 @@ const generatePeriodsFromPreset = (presetType, yearStart, yearEnd) => {
         });
 
         // Next period starts the day after this one ends
-        currentDate = new Date(periodEnd);
-        currentDate.setDate(currentDate.getDate() + 1);
-        currentDate.setUTCHours(0, 0, 0, 0);
+        currentOffset += daysInPeriod;
     }
 
     return periods;
