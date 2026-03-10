@@ -12,7 +12,7 @@ const connectDB = require('./config/db');             // ДОЛЖНА возвр
 
 console.log('[DEBUG] libs imported');
 
-const app = express();
+console.log("Loading routes"); const app = express();
 
 // ────────────────────── Middleware ──────────────────────
 app.use(cors());

@@ -7,7 +7,7 @@ exports.createHomework = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Необходима аутентификация' });
     }
-    
+
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав на создание домашек' });
     }
@@ -58,7 +58,7 @@ exports.updateHomework = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Необходима аутентификация' });
     }
-    
+
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав' });
     }
@@ -85,7 +85,7 @@ exports.deleteHomework = async (req, res) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Необходима аутентификация' });
     }
-    
+
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Нет прав' });
     }
@@ -106,12 +106,12 @@ exports.getHomeworkByClassroom = async (req, res) => {
   try {
     const { classroomId } = req.params;
     console.log('[getHomeworkByClassroom] classroomId:', classroomId, 'user:', req.user.userId, 'role:', req.user.role);
-    
+
     const homeworks = await Homework.find({ classId: classroomId })
       .populate('classId')
       .populate('teacher', '-password')
       .sort({ dueDate: 1 });
-    
+
     console.log('[getHomeworkByClassroom] found homeworks:', homeworks.length);
     res.json(homeworks);
   } catch (error) {
@@ -127,23 +127,28 @@ exports.getHomeworkByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
     console.log('[getHomeworkByStudent] studentId:', studentId, 'user:', req.user.userId, 'role:', req.user.role);
-    
+
     // Студент может смотреть только свои домашние задания
     if (req.user.role === 'student' && String(req.user.userId) !== String(studentId)) {
       return res.status(403).json({ message: 'Нет прав' });
     }
-    
-    // Найти все домашние задания, где студент в assignedTo или класс студента
+
+    // Получаем классы студента для поиска class-wide homework
+    const User = require('../models/User');
+    const student = await User.findById(studentId).select('classRooms');
+    const classIds = student?.classRooms || [];
+
+    // Найти все домашние задания, где студент в assignedTo ИЛИ задание для класса студента
     const homeworks = await Homework.find({
       $or: [
         { assignedTo: studentId },
-        // Можно добавить поиск по классу студента, если нужно
+        { classId: { $in: classIds } }
       ]
     })
       .populate('classId')
       .populate('teacher', '-password')
       .sort({ dueDate: 1 });
-    
+
     console.log('[getHomeworkByStudent] found homeworks:', homeworks.length);
     res.json(homeworks);
   } catch (error) {
@@ -159,17 +164,17 @@ exports.getHomeworkByTeacher = async (req, res) => {
   try {
     const { teacherId } = req.params;
     console.log('[getHomeworkByTeacher] teacherId:', teacherId, 'user:', req.user.userId, 'role:', req.user.role);
-    
+
     // Учитель может смотреть только свои домашние задания
     if (req.user.role === 'teacher' && String(req.user.userId) !== String(teacherId)) {
       return res.status(403).json({ message: 'Нет прав' });
     }
-    
+
     const homeworks = await Homework.find({ teacher: teacherId })
       .populate('classId')
       .populate('teacher', '-password')
       .sort({ dueDate: 1 });
-    
+
     console.log('[getHomeworkByTeacher] found homeworks:', homeworks.length);
     res.json(homeworks);
   } catch (error) {

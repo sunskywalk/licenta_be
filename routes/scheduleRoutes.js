@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const scheduleController = require('../controllers/scheduleController');
+const scheduleImportExport = require('../controllers/scheduleImportExport');
 const { protect, checkRole } = require('../middleware/authMiddleware');
 
 // создать расписание (admin)
@@ -30,6 +31,24 @@ router.get('/day/:dayOfWeek', protect, scheduleController.getScheduleByDay);
 
 // получить расписание с событиями для конкретной даты
 router.get('/with-events/:userId/:date', protect, scheduleController.getScheduleWithEvents);
+
+// ─────────────────────────────────────────────────────────
+// Schedule Import/Export (admin only)
+// ВАЖНО: эти маршруты ДОЛЖНЫ быть ДО /:id чтобы не перехватывались
+// ─────────────────────────────────────────────────────────
+
+// Скачать шаблон для импорта (admin only)
+router.get('/export-template', protect, checkRole(['admin']), scheduleImportExport.getImportTemplate);
+
+// Экспорт расписания в JSON (доступно admin и teacher)
+router.get('/export/:classId', protect, checkRole(['admin', 'teacher']), scheduleImportExport.exportSchedule);
+
+// Импорт расписания из JSON
+router.post('/import', protect, checkRole(['admin']), scheduleImportExport.importSchedule);
+
+// ─────────────────────────────────────────────────────────
+// CRUD by ID (MUST be LAST — /:id is a catch-all)
+// ─────────────────────────────────────────────────────────
 
 // получить одно
 router.get('/:id', protect, scheduleController.getScheduleById);

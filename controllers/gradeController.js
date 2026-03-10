@@ -303,11 +303,15 @@ exports.getTeacherSubjects = async (req, res) => {
     const teacherId = req.user.userId;
     console.log('[getTeacherSubjects] teacherId:', teacherId);
 
-    // Получаем все уникальные предметы учителя
-    const subjects = await Grade.distinct('subject', { teacher: teacherId });
-    console.log('[getTeacherSubjects] Found subjects:', subjects);
+    // Получаем актуальные предметы из профиля учителя
+    const teacher = await User.findById(teacherId);
+    if (!teacher) {
+      return res.status(404).json({ message: 'Учитель не найден' });
+    }
+    const subjects = teacher.subjects || [];
+    console.log('[getTeacherSubjects] Found subjects from profile:', subjects);
 
-    // Для каждого предмета считаем количество оценок
+    // Для каждого предмета считаем количество поставленных оценок
     const subjectsWithCounts = await Promise.all(
       subjects.map(async (subject) => {
         const count = await Grade.countDocuments({ teacher: teacherId, subject });
@@ -335,9 +339,13 @@ exports.getTeacherSubjectsById = async (req, res) => {
       return res.status(403).json({ message: 'Нет прав для получения предметов этого учителя' });
     }
 
-    // Получаем все уникальные предметы учителя
-    const subjects = await Grade.distinct('subject', { teacher: teacherId });
-    console.log('[getTeacherSubjectsById] Found subjects:', subjects);
+    // Получаем предметы из профиля
+    const teacher = await User.findById(teacherId);
+    if (!teacher) {
+      return res.status(404).json({ message: 'Учитель не найден' });
+    }
+    const subjects = teacher.subjects || [];
+    console.log('[getTeacherSubjectsById] Found subjects from profile:', subjects);
 
     // Для каждого предмета считаем количество оценок
     const subjectsWithCounts = await Promise.all(
@@ -487,9 +495,15 @@ exports.getStudentGradeStats = async (req, res) => {
 
     let filter = { student: studentId };
 
-    // Add academic year filter if provided
+    // Add academic year filter if provided — use $or to handle grades that may not have
+    // the academicYear field set (older data), include those too
     if (year) {
-      filter.academicYear = parseInt(year);
+      const yearInt = parseInt(year);
+      filter.$or = [
+        { academicYear: yearInt },
+        { academicYear: { $exists: false } },
+        { academicYear: null }
+      ];
     }
 
     // Проверка прав доступа для учителя и студента

@@ -587,12 +587,21 @@ exports.getStudentLessonDetails = async (req, res) => {
 // @access  Private
 exports.getCurrentAcademicInfo = async (req, res) => {
   try {
-    const info = academicConfig.getCurrentWeekAndSemester();
+    // Try async version first (uses AcademicYear DB model)
+    let info;
+    try {
+      info = await academicConfig.getCurrentWeekAndSemesterAsync();
+    } catch (e) {
+      // Fallback to sync version
+      info = academicConfig.getCurrentWeekAndSemester();
+    }
     const config = academicConfig.getAcademicYearConfig();
 
     res.json({
       ...info,
-      academicYearLabel: `${config.academicYear}-${config.academicYear + 1}`,
+      // Include currentYear for frontend display
+      currentYear: info.academicYear || config.academicYear,
+      academicYearLabel: `${info.academicYear || config.academicYear}-${(info.academicYear || config.academicYear) + 1}`,
       semester1: {
         start: config.semester1.start.toISOString().split('T')[0],
         end: config.semester1.end.toISOString().split('T')[0],
@@ -617,19 +626,24 @@ exports.getWeekDates = async (req, res) => {
     const semesterNum = parseInt(semester);
     const weekNum = parseInt(week);
 
-    if (![1, 2].includes(semesterNum) || weekNum < 1 || weekNum > 16) {
+    if (isNaN(semesterNum) || isNaN(weekNum) || weekNum < 1) {
       return res.status(400).json({
-        message: 'Invalid semester or week. Semester must be 1 or 2, week must be 1-16'
+        message: 'Invalid semester or week.'
       });
     }
 
-    const dates = academicConfig.getWeekDates(semesterNum, weekNum);
-    const weekStart = academicConfig.getWeekStartDate(semesterNum, weekNum);
+    const dates = await academicConfig.getWeekDates(semesterNum, weekNum);
+    const weekStart = await academicConfig.getWeekStartDate(semesterNum, weekNum);
+
+    // Calculate weekend end
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
 
     res.json({
       semester: semesterNum,
       week: weekNum,
-      weekStartDate: weekStart.toISOString().split('T')[0],
+      startDate: weekStart.toISOString().split('T')[0],
+      endDate: weekEnd.toISOString().split('T')[0],
       dates,
     });
   } catch (error) {
