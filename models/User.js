@@ -45,9 +45,12 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-// Хэширование пароля перед сохранением
+// Хэширование пароля и нормализация email перед сохранением
 userSchema.pre('save', async function (next) {
   try {
+    if (this.isModified('email')) {
+      this.email = this.email.toLowerCase();
+    }
     if (!this.isModified('password')) {
       return next();
     }

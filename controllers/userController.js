@@ -9,7 +9,8 @@ const bcrypt = require('bcrypt');
 // ========================
 exports.registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, classRooms } = req.body;
+    let { name, email, password, role, classRooms } = req.body;
+    if (email) email = email.toLowerCase();
 
     // Проверяем - только admin может создавать
     if (!req.user || req.user.role !== 'admin') {
@@ -65,7 +66,8 @@ exports.registerUser = async (req, res) => {
 // ========================
 exports.loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    if (email) email = email.toLowerCase();
     const user = await User.findOne({ email }).populate('classRooms');
     if (!user) {
       return res.status(400).json({ message: 'Неверный email или пароль' });
@@ -152,8 +154,9 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, email, password, role, classRooms } = req.body;
-    
+    let { name, email, password, role, classRooms } = req.body;
+    if (email) email = email.toLowerCase();
+
     // admin может менять любого, пользователь - только себя (без смены роли)
     if (!req.user || (req.user.role !== 'admin' && req.user.userId !== userId)) {
       return res.status(403).json({ message: 'Нет прав' });

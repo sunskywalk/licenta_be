@@ -34,7 +34,7 @@ const teacherNames = [
 
 // Предметы
 const subjects = [
-  'Mathematics', 'Romanian', 'English', 'History', 'Geography', 
+  'Mathematics', 'Romanian', 'English', 'History', 'Geography',
   'Physics', 'Chemistry', 'Biology', 'Physical Education', 'Art',
   'Music', 'Computer Science', 'French', 'German'
 ];
@@ -138,7 +138,7 @@ async function seed() {
 
     for (let classIndex = 0; classIndex < classrooms.length; classIndex++) {
       const studentsPerClass = Math.floor(Math.random() * 8) + 18; // 18-25 учеников в классе
-      
+
       for (let i = 0; i < studentsPerClass; i++) {
         if (studentIndex >= studentNames.length) {
           // Если имена закончились, генерируем новые
@@ -172,25 +172,25 @@ async function seed() {
       // Каждому классу назначаем 3-5 учителей
       const teachersPerClass = Math.floor(Math.random() * 3) + 3;
       const assignedTeachers = [];
-      
+
       for (let j = 0; j < teachersPerClass; j++) {
         let randomTeacher = teachers[Math.floor(Math.random() * teachers.length)];
-        
+
         // Избегаем дублирования
         while (assignedTeachers.includes(randomTeacher._id)) {
           randomTeacher = teachers[Math.floor(Math.random() * teachers.length)];
         }
-        
+
         assignedTeachers.push(randomTeacher._id);
         classrooms[i].teachers.push(randomTeacher._id);
-        
+
         // Добавляем класс к учителю
         if (!randomTeacher.classRooms.includes(classrooms[i]._id)) {
           randomTeacher.classRooms.push(classrooms[i]._id);
           await randomTeacher.save();
         }
       }
-      
+
       await classrooms[i].save();
     }
 
@@ -200,35 +200,35 @@ async function seed() {
     // 6. Создаём оценки (много!)
     // =============================
     let totalGrades = 0;
-    
+
     for (const classroom of classrooms) {
       const classTeachers = await User.find({ _id: { $in: classroom.teachers } });
       const classStudents = await User.find({ _id: { $in: classroom.students } });
-      
+
       // Для каждого учителя в классе
       for (let teacherIndex = 0; teacherIndex < classTeachers.length; teacherIndex++) {
         const teacher = classTeachers[teacherIndex];
-        
+
         // Находим индекс учителя в массиве teacherNames
         const teacherNameIndex = teacherNames.findIndex(name => name === teacher.name);
-        
+
         // Если учитель найден, используем его предметы, иначе берем первые 2 предмета
-        const assignedSubjects = teacherNameIndex !== -1 
-          ? teacherSubjects[teacherNameIndex] 
+        const assignedSubjects = teacherNameIndex !== -1
+          ? teacherSubjects[teacherNameIndex]
           : subjects.slice(0, 2);
-        
+
         console.log(`Teacher ${teacher.name} will teach: ${assignedSubjects.join(', ')}`);
-        
+
         // Для каждого предмета создаём оценки всем ученикам
         for (const subject of assignedSubjects) {
           for (const student of classStudents) {
             // Создаём 3-8 обычных оценок
             const gradeCount = Math.floor(Math.random() * 6) + 3;
-            
+
             for (let i = 0; i < gradeCount; i++) {
               const gradeTypes = ['homework', 'test', 'lesson', 'homework'];
               const randomType = gradeTypes[Math.floor(Math.random() * gradeTypes.length)];
-              
+
               await Grade.create({
                 student: student._id,
                 subject: subject,
@@ -242,7 +242,7 @@ async function seed() {
               });
               totalGrades++;
             }
-            
+
             // Добавляем итоговую оценку (50% вероятность)
             if (Math.random() > 0.5) {
               await Grade.create({
@@ -269,28 +269,28 @@ async function seed() {
     // 7. Создаём расписание на весь месяц
     // =============================
     let scheduleCount = 0;
-    
+
     for (const classroom of classrooms) {
       const classTeachers = await User.find({ _id: { $in: classroom.teachers } });
-      
+
       // Создаём расписание на 4 недели (понедельник-пятница)
       for (let week = 1; week <= 4; week++) {
         for (let day = 1; day <= 5; day++) {
           const periodsPerDay = Math.floor(Math.random() * 3) + 4; // 4-6 уроков в день
           const periods = [];
-          
+
           for (let period = 0; period < periodsPerDay; period++) {
             const startHour = 8 + period;
             const teacher = classTeachers[Math.floor(Math.random() * classTeachers.length)];
-            
+
             // Находим индекс учителя и берем один из его предметов
             const teacherNameIndex = teacherNames.findIndex(name => name === teacher.name);
-            const assignedSubjects = teacherNameIndex !== -1 
-              ? teacherSubjects[teacherNameIndex] 
+            const assignedSubjects = teacherNameIndex !== -1
+              ? teacherSubjects[teacherNameIndex]
               : subjects.slice(0, 2);
-            
+
             const subject = assignedSubjects[Math.floor(Math.random() * assignedSubjects.length)];
-            
+
             periods.push({
               startTime: `${startHour.toString().padStart(2, '0')}:00`,
               endTime: `${startHour.toString().padStart(2, '0')}:45`,
@@ -299,7 +299,7 @@ async function seed() {
               room: `Room ${Math.floor(Math.random() * 20) + 101}`
             });
           }
-          
+
           await Schedule.create({
             classId: classroom._id,
             dayOfWeek: day,
@@ -326,24 +326,24 @@ async function seed() {
     ];
 
     let homeworkCount = 0;
-    
+
     for (const classroom of classrooms) {
       const classTeachers = await User.find({ _id: { $in: classroom.teachers } });
-      
+
       // Каждый учитель создаёт 2-4 домашних задания
       for (const teacher of classTeachers) {
         const hwCount = Math.floor(Math.random() * 3) + 2;
-        
+
         // Находим предметы учителя
         const teacherNameIndex = teacherNames.findIndex(name => name === teacher.name);
-        const assignedSubjects = teacherNameIndex !== -1 
-          ? teacherSubjects[teacherNameIndex] 
+        const assignedSubjects = teacherNameIndex !== -1
+          ? teacherSubjects[teacherNameIndex]
           : subjects.slice(0, 2);
-        
+
         for (let i = 0; i < hwCount; i++) {
           const title = homeworkTitles[Math.floor(Math.random() * homeworkTitles.length)];
           const subject = assignedSubjects[Math.floor(Math.random() * assignedSubjects.length)];
-          
+
           await Homework.create({
             classId: classroom._id,
             subject: subject,
@@ -364,11 +364,11 @@ async function seed() {
     // 9. Создаём записи посещаемости
     // =============================
     let attendanceCount = 0;
-    
+
     for (const classroom of classrooms) {
       const classStudents = await User.find({ _id: { $in: classroom.students } });
       const classTeachers = await User.find({ _id: { $in: classroom.teachers } });
-      
+
       // Для каждого ученика создаём записи посещаемости за последние 30 дней
       for (const student of classStudents) {
         for (let day = 0; day < 30; day++) {
@@ -376,19 +376,19 @@ async function seed() {
           const date = new Date();
           date.setDate(date.getDate() - day);
           if (date.getDay() === 0 || date.getDay() === 6) continue;
-          
+
           // 85% вероятность присутствия
           const status = Math.random() > 0.15 ? 'present' : (Math.random() > 0.5 ? 'absent' : 'late');
           const teacher = classTeachers[Math.floor(Math.random() * classTeachers.length)];
-          
+
           // Находим предметы учителя
           const teacherNameIndex = teacherNames.findIndex(name => name === teacher.name);
-          const assignedSubjects = teacherNameIndex !== -1 
-            ? teacherSubjects[teacherNameIndex] 
+          const assignedSubjects = teacherNameIndex !== -1
+            ? teacherSubjects[teacherNameIndex]
             : subjects.slice(0, 2);
-          
+
           const subject = assignedSubjects[Math.floor(Math.random() * assignedSubjects.length)];
-          
+
           await Attendance.create({
             student: student._id,
             subject: subject,
@@ -414,12 +414,12 @@ async function seed() {
     ];
 
     let notificationCount = 0;
-    
+
     // Создаём общие уведомления от админа
     for (let i = 0; i < 10; i++) {
       const title = notificationTitles[Math.floor(Math.random() * notificationTitles.length)];
       const allStudents = students.map(s => s._id);
-      
+
       await Notification.create({
         title: title,
         message: `Important announcement regarding ${title.toLowerCase()}. Please check with your teachers for more details.`,
@@ -434,21 +434,21 @@ async function seed() {
     // Создаём уведомления от учителей
     for (const teacher of teachers) {
       const teacherClasses = await Classroom.find({ teachers: teacher._id });
-      
+
       for (const classroom of teacherClasses) {
         const classStudents = await User.find({ _id: { $in: classroom.students } });
-        
+
         // Находим предметы учителя
         const teacherNameIndex = teacherNames.findIndex(name => name === teacher.name);
-        const assignedSubjects = teacherNameIndex !== -1 
-          ? teacherSubjects[teacherNameIndex] 
+        const assignedSubjects = teacherNameIndex !== -1
+          ? teacherSubjects[teacherNameIndex]
           : subjects.slice(0, 2);
-        
+
         // 2-3 уведомления на класс
         for (let i = 0; i < 3; i++) {
           const subject = assignedSubjects[Math.floor(Math.random() * assignedSubjects.length)];
           const title = `${subject} Update`;
-          
+
           await Notification.create({
             title: title,
             message: `Class ${classroom.name}: Important update about upcoming assignments and tests.`,
@@ -474,26 +474,33 @@ async function seed() {
     console.log(`👨‍🎓 Students: ${students.length}`);
     console.log(`🏫 Classrooms: ${classrooms.length}`);
     console.log(`📊 Grades: ${totalGrades}`);
-    console.log(`📅 Schedules: ${scheduleCount}`);
-    console.log(`📝 Homework: ${homeworkCount}`);
-    console.log(`📋 Attendance: ${attendanceCount}`);
-    console.log(`🔔 Notifications: ${notificationCount}`);
+    console.log('\n[SUCCESS] DATABASE SEEDING COMPLETED!');
     console.log('=====================================');
-    
-    console.log('\n📚 TEACHER SUBJECTS ASSIGNMENT:');
+    console.log(`[INFO] Admin: 1`);
+    console.log(`[INFO] Teachers: ${teachers.length}`);
+    console.log(`[INFO] Students: ${students.length}`);
+    console.log(`[INFO] Classrooms: ${classrooms.length}`);
+    console.log(`[INFO] Grades: ${totalGrades}`);
+    console.log(`[INFO] Schedules: ${scheduleCount}`);
+    console.log(`[INFO] Homework: ${homeworkCount}`);
+    console.log(`[INFO] Attendance: ${attendanceCount}`);
+    console.log(`[INFO] Notifications: ${notificationCount}`);
+    console.log('=====================================');
+
+    console.log('\n[INFO] TEACHER SUBJECTS ASSIGNMENT:');
     for (let i = 0; i < teacherNames.length; i++) {
       console.log(`${teacherNames[i]}: ${teacherSubjects[i].join(', ')}`);
     }
 
-    console.log('\n🔑 TEST ACCOUNTS:');
+    console.log('\n[INFO] TEST ACCOUNTS:');
     console.log('Admin: admin@school.com / admin123');
     console.log('Teachers: teacher1@school.com to teacher8@school.com / teacher123');
     console.log('Students: student1@school.com to student[N]@school.com / student123');
-    console.log('\n✨ Ready for testing! ✨\n');
+    console.log('\n[INFO] Ready for testing!\n');
 
     process.exit();
   } catch (error) {
-    console.error('❌ Seeding error:', error);
+    console.error('[ERROR] Seeding error:', error);
     process.exit(1);
   }
 }

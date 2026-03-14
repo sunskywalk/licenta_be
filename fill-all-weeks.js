@@ -7,11 +7,11 @@ async function fillAllWeeks() {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log('✅ Connected to MongoDB');
+    console.log('[OK] Connected to MongoDB');
 
     // Получаем все существующие расписания
     const existingSchedules = await Schedule.find({});
-    console.log(`📅 Found ${existingSchedules.length} existing schedules`);
+    console.log(`[INFO] Found ${existingSchedules.length} existing schedules`);
 
     // Группируем по классам и дням
     const schedulesByClassAndDay = {};
@@ -23,28 +23,28 @@ async function fillAllWeeks() {
       schedulesByClassAndDay[key].push(schedule);
     });
 
-    console.log(`📊 Found ${Object.keys(schedulesByClassAndDay).length} unique class-day combinations`);
+    console.log(`[INFO] Found ${Object.keys(schedulesByClassAndDay).length} unique class-day combinations`);
 
     let createdCount = 0;
     let skippedCount = 0;
 
     // Для каждого семестра создаем 16 недель
     for (let semester = 1; semester <= 2; semester++) {
-      console.log(`\n🎓 Processing semester ${semester}...`);
-      
+      console.log(`\n[INFO] Processing semester ${semester}...`);
+
       for (let week = 1; week <= 16; week++) {
-        console.log(`📅 Processing week ${week}...`);
-        
+        console.log(`[INFO] Processing week ${week}...`);
+
         // Проходим по всем уникальным комбинациям класс-день
         for (const [key, schedules] of Object.entries(schedulesByClassAndDay)) {
           const [classId, dayOfWeek, originalSemester] = key.split('_');
-          
+
           // Пропускаем если это не текущий семестр
           if (parseInt(originalSemester) !== semester) continue;
-          
+
           // Берем первое расписание как шаблон
           const templateSchedule = schedules[0];
-          
+
           // Проверяем, есть ли уже расписание для этой недели
           const existingWeekSchedule = await Schedule.findOne({
             classId: templateSchedule.classId,
@@ -53,12 +53,12 @@ async function fillAllWeeks() {
             semester: semester,
             year: templateSchedule.year
           });
-          
+
           if (existingWeekSchedule) {
             skippedCount++;
             continue;
           }
-          
+
           // Создаем новое расписание для этой недели
           const newSchedule = new Schedule({
             classId: templateSchedule.classId,
@@ -74,23 +74,23 @@ async function fillAllWeeks() {
               room: period.room
             }))
           });
-          
+
           await newSchedule.save();
           createdCount++;
         }
       }
     }
 
-    console.log(`\n🎉 Filling completed!`);
-    console.log(`✅ Created schedules: ${createdCount}`);
-    console.log(`⏭️ Skipped existing: ${skippedCount}`);
+    console.log(`\n[SUCCESS] Filling completed!`);
+    console.log(`[OK] Created schedules: ${createdCount}`);
+    console.log(`[SKIP] Skipped existing: ${skippedCount}`);
 
     // Проверяем результат
     const totalSchedules = await Schedule.countDocuments();
-    console.log(`📊 Total schedules in database: ${totalSchedules}`);
+    console.log(`[INFO] Total schedules in database: ${totalSchedules}`);
 
     // Показываем статистику по неделям
-    console.log('\n📈 Schedules per week:');
+    console.log('\n[INFO] Schedules per week:');
     for (let week = 1; week <= 16; week++) {
       const weekCount = await Schedule.countDocuments({ week: week });
       console.log(`  Week ${week}: ${weekCount} schedules`);
@@ -98,7 +98,7 @@ async function fillAllWeeks() {
 
     mongoose.connection.close();
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('[ERROR] Error:', error);
     mongoose.connection.close();
   }
 }
