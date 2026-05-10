@@ -1,36 +1,35 @@
-// routes/classRoutes.js
 const express = require('express');
 const router = express.Router();
-const classController = require('../controllers/classController');
+const classController = require('../controllers/classController/index');
 const { protect } = require('../middleware/authMiddleware');
 
-// Создать класс (admin)
+// Admin creates a class.
 router.post('/', protect, classController.createClass);
 
-// Получить все
+// List classes.
 router.get('/', protect, classController.getAllClasses);
 
-// Получить 1
+// Get one class.
 router.get('/:id', protect, classController.getClassById);
 
-// Получить класс с детальной статистикой (admin)
+// Get class stats.
 router.get('/:id/stats', protect, classController.getClassWithStats);
 
-// Обновить (admin)
+// Admin updates a class.
 router.put('/:id', protect, classController.updateClass);
 
-// Удалить (admin)
+// Admin deletes a class.
 router.delete('/:id', protect, classController.deleteClass);
 
-// Назначить классного руководителя (admin)
+// Admin sets the homeroom teacher.
 router.put('/:id/homeroom-teacher', protect, classController.assignHomeroomTeacher);
 
-// Управление учениками в классах
+// Move students between classes.
 router.post('/students/add', protect, classController.addStudentToClass);
 router.post('/students/remove', protect, classController.removeStudentFromClass);
 router.get('/students/available', protect, classController.getAvailableStudents);
 
-// Получение данных для создания класса
+// Data needed by class forms.
 router.get('/data/teachers', protect, classController.getAllTeachers);
 router.get('/data/students', protect, classController.getAllStudentsForClass);
 router.get('/data/subjects', protect, classController.getSubjectsList);
