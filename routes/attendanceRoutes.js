@@ -17,7 +17,7 @@ const {
   getAttendanceByDate,
   createBulkAttendance,
   getStudentAttendanceWithGrades
-} = require('../controllers/attendanceController');
+} = require('../controllers/attendanceController/index'); // explicit /index so Node never picks a stray *.js sibling over this folder
 const { protect, checkRole } = require('../middleware/authMiddleware');
 
 // Public routes (if any)
