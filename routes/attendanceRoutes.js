@@ -1,4 +1,3 @@
-// routes/attendanceRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -16,36 +15,33 @@ const {
   getAttendanceByClass,
   getAttendanceByDate,
   createBulkAttendance,
-  getStudentAttendanceWithGrades
-} = require('../controllers/attendanceController/index'); // explicit /index so Node never picks a stray *.js sibling over this folder
+  getStudentAttendanceWithGrades,
+} = require('../controllers/attendanceController/index');
 const { protect, checkRole } = require('../middleware/authMiddleware');
 
-// Public routes (if any)
-
-// Protected routes
 router.use(protect);
 
 router.route('/')
-  .get(protect, checkRole(['admin', 'teacher']), getAllAttendance) 
-  .post(protect, checkRole(['teacher']), createAttendance);
+  .get(checkRole(['admin', 'teacher']), getAllAttendance)
+  .post(checkRole(['teacher']), createAttendance);
 
-router.post('/mark', protect, checkRole(['teacher']), markAttendance);
-router.post('/bulk', protect, checkRole(['teacher', 'admin']), createBulkAttendance);
+router.post('/mark', checkRole(['teacher']), markAttendance);
+router.post('/bulk', checkRole(['teacher', 'admin']), createBulkAttendance);
 
-router.get('/class/:classId/date/:date', protect, checkRole(['teacher']), getAttendanceByClassAndDate);
-router.get('/class/:classId', protect, checkRole(['teacher', 'admin']), getAttendanceByClass);
-router.get('/class/:classId/stats', protect, checkRole(['teacher', 'admin']), getClassAttendanceStats);
+router.get('/class/:classId/date/:date', checkRole(['teacher']), getAttendanceByClassAndDate);
+router.get('/class/:classId', checkRole(['teacher', 'admin']), getAttendanceByClass);
+router.get('/class/:classId/stats', checkRole(['teacher', 'admin']), getClassAttendanceStats);
 
-router.get('/date/:date', protect, checkRole(['teacher', 'admin']), getAttendanceByDate);
+router.get('/date/:date', checkRole(['teacher', 'admin']), getAttendanceByDate);
 
-router.get('/student/:studentId', protect, checkRole(['student', 'teacher', 'admin']), getStudentAttendance);
-router.get('/student/:studentId/with-grades', protect, checkRole(['student', 'teacher', 'admin']), getStudentAttendanceWithGrades);
-router.get('/student/:studentId/stats', protect, checkRole(['student', 'teacher', 'admin']), getStudentAttendanceStats);
-router.get('/teacher/:teacherId', protect, checkRole(['teacher', 'admin']), getTeacherAttendance);
+router.get('/student/:studentId', checkRole(['student', 'teacher', 'admin']), getStudentAttendance);
+router.get('/student/:studentId/with-grades', checkRole(['student', 'teacher', 'admin']), getStudentAttendanceWithGrades);
+router.get('/student/:studentId/stats', checkRole(['student', 'teacher', 'admin']), getStudentAttendanceStats);
+router.get('/teacher/:teacherId', checkRole(['teacher', 'admin']), getTeacherAttendance);
 
 router.route('/:id')
-  .get(protect, checkRole(['student', 'teacher', 'admin']), getAttendanceById)
-  .put(protect, checkRole(['teacher']), updateAttendance)
-  .delete(protect, checkRole(['admin']), deleteAttendance);
+  .get(checkRole(['student', 'teacher', 'admin']), getAttendanceById)
+  .put(checkRole(['teacher']), updateAttendance)
+  .delete(checkRole(['admin']), deleteAttendance);
 
 module.exports = router;
