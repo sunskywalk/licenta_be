@@ -1,5 +1,6 @@
-// models/Attendance.js
 const mongoose = require('mongoose');
+
+const ATTENDANCE_STATUSES = ['present', 'absent', 'late', 'excused'];
 
 const attendanceSchema = new mongoose.Schema({
   student: {
@@ -27,7 +28,7 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['present', 'absent', 'late', 'excused'],
+    enum: ATTENDANCE_STATUSES,
     default: 'present',
   },
 }, {

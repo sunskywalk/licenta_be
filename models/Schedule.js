@@ -1,45 +1,36 @@
-// models/Schedule.js
 const mongoose = require('mongoose');
 
-// Helper function to convert time string to minutes
-const timeToMinutes = (timeStr) => {
+function timeToMinutes(timeStr) {
   const [hours, minutes] = timeStr.split(':').map(Number);
   return hours * 60 + minutes;
-};
+}
 
 const schedulePeriodSchema = new mongoose.Schema({
   startTime: {
     type: String,
     required: [true, 'Время начала обязательно'],
     validate: {
-      validator: function (v) {
-        // Check format HH:mm (with leading zeros)
+      validator(v) {
         return /^([01]?\d|2[0-3]):([0-5]\d)$/.test(v);
       },
-      message: 'Формат времени должен быть HH:mm (например, 09:00 или 14:30)'
-    }
+      message: 'Формат времени должен быть HH:mm (например, 09:00 или 14:30)',
+    },
   },
   endTime: {
     type: String,
     required: [true, 'Время окончания обязательно'],
     validate: {
-      validator: function (v) {
-        // Check format HH:mm
+      validator(v) {
         if (!/^([01]?\d|2[0-3]):([0-5]\d)$/.test(v)) {
           return false;
         }
-
-        // Check that endTime > startTime
         if (this.startTime) {
-          const startMinutes = timeToMinutes(this.startTime);
-          const endMinutes = timeToMinutes(v);
-          return endMinutes > startMinutes;
+          return timeToMinutes(v) > timeToMinutes(this.startTime);
         }
-
         return true;
       },
-      message: 'Время окончания должно быть позже времени начала и в формате HH:mm'
-    }
+      message: 'Время окончания должно быть позже времени начала и в формате HH:mm',
+    },
   },
   subject: {
     type: String,
@@ -56,6 +47,8 @@ const schedulePeriodSchema = new mongoose.Schema({
   },
 });
 
+const DAYS_OF_WEEK = [0, 1, 2, 3, 4, 5, 6];
+
 const scheduleSchema = new mongoose.Schema({
   classId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -64,7 +57,7 @@ const scheduleSchema = new mongoose.Schema({
   },
   dayOfWeek: {
     type: Number,
-    enum: [0, 1, 2, 3, 4, 5, 6], // 0 = Sunday, 1 = Monday, etc.
+    enum: DAYS_OF_WEEK,
     required: true,
   },
   week: {
@@ -82,36 +75,23 @@ const scheduleSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Год обязателен'],
   },
-
-  // ─────────────────────────────────────────────────────────
-  // Новые поля для гибкой системы Academic Year (опциональные)
-  // После настройки AcademicYear админом эти поля будут использоваться
-  // ─────────────────────────────────────────────────────────
-
-  // Ссылка на конфигурацию учебного года
+  // optional migration fields — old rows still work without these
   academicYearId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AcademicYear',
-    // НЕ required — позволяет постепенный переход
   },
-
-  // Номер периода (1, 2, 3...) — привязка к periods[] в AcademicYear
   periodNumber: {
     type: Number,
     min: 1,
-    // НЕ required — fallback на старое поле semester
   },
-
   periods: [schedulePeriodSchema],
 }, {
   timestamps: true,
 });
 
-// Виртуальное поле для обратной совместимости
+// backwards compat: periodNumber wins, else fall back to semester
 scheduleSchema.virtual('effectivePeriodNumber').get(function () {
-  // Если есть новое поле — используем его, иначе старый semester
   return this.periodNumber || this.semester;
 });
-
 
 module.exports = mongoose.model('Schedule', scheduleSchema);

@@ -1,4 +1,3 @@
-// models/Homework.js
 const mongoose = require('mongoose');
 
 const homeworkSchema = new mongoose.Schema({

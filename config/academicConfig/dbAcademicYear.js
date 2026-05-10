@@ -1,4 +1,4 @@
-const AcademicYear = require('../../models/AcademicYear');
+const AcademicYear = require('../../models/AcademicYear/index');
 const { CACHE_TTL, DEFAULT_PERIOD_WEEK_COUNT, MS_PER_WEEK } = require('./constants');
 const { getCachedAcademicYear, getCacheTimestamp, setCachedAcademicYear } = require('./cacheStore');
 const { getCurrentWeekAndSemester } = require('./fallbackConfig');

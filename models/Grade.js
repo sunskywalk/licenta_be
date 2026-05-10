@@ -1,5 +1,12 @@
-// models/Grade.js
 const mongoose = require('mongoose');
+
+const GRADE_TYPES = ['homework', 'lesson', 'test', 'final'];
+const SEMESTERS = [1, 2];
+
+function defaultAcademicYear() {
+  const now = new Date();
+  return now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+}
 
 const gradeSchema = new mongoose.Schema({
   student: {
@@ -21,33 +28,24 @@ const gradeSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  // Тип оценки: домашка, урок, контрольная, итоговая
   type: {
     type: String,
-    enum: ['homework', 'lesson', 'test', 'final'],
+    enum: GRADE_TYPES,
     default: 'lesson',
   },
-  // Семестр
   semester: {
     type: Number,
-    enum: [1, 2],
+    enum: SEMESTERS,
     required: [true, 'Нужно указать семестр (1 или 2)'],
   },
-  // Учебный год (e.g., 2024 for 2024/2025)
   academicYear: {
     type: Number,
-    default: function () {
-      const now = new Date();
-      // If current month is September or later, use current year, else previous year
-      return now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-    },
+    default: defaultAcademicYear,
   },
-  // Числовая оценка
   value: {
     type: Number,
     required: [true, 'Оценка обязательна'],
   },
-  // Комментарий к оценке
   comment: {
     type: String,
     default: '',

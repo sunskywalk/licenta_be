@@ -1,6 +1,7 @@
-// models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+
+const ROLES = ['admin', 'teacher', 'student'];
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -18,21 +19,17 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher', 'student'],
+    enum: ROLES,
     default: 'student',
   },
-  // Код учителя для идентификации
   teacherCode: {
     type: String,
-    sparse: true, // Только для учителей
+    sparse: true,
   },
-  // Предметы, которые преподает учитель
   subjects: {
     type: [String],
     default: [],
   },
-  // Ссылка на класс (для учеников). Учитель может быть в нескольких классах, 
-  // поэтому сделаем массив для teacher, но это можно адаптировать под разные сценарии.
   classRooms: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -45,7 +42,7 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-// Хэширование пароля и нормализация email перед сохранением
+// lowercase email + hash password when it is changed
 userSchema.pre('save', async function (next) {
   try {
     if (this.isModified('email')) {
@@ -62,9 +59,8 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-// Проверка пароля
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);
