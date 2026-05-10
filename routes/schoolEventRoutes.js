@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const schoolEventController = require('../controllers/schoolEventController');
+const schoolEventController = require('../controllers/schoolEventController/index');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 
 // GET routes - available for all authenticated users (students/teachers need to see events)

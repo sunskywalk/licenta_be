@@ -1,7 +1,7 @@
 // routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
-const userController = require('../controllers/userController');
+const userController = require('../controllers/userController/index');
 const { protect } = require('../middleware/authMiddleware');
 
 // Логин - публично

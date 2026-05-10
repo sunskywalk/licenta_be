@@ -1,76 +1,61 @@
-/**
- * JWT-middleware: проверяет наличие и валидность токена.
- * ------------------------------------------------------
- *  - Authorization: Bearer <token>
- *  - После валидации кладёт payload в req.user
- *  - В случае ошибки возвращает 401 / 403
- */
+// JWT guard: Bearer token → req.user { userId, role }; 401/403 on failure
 
 const jwt = require('jsonwebtoken');
 
-/**
- * Защита любого роут-хендлера.
- * Используется так:  app.use('/api/private', protect, privateRouter);
- */
+const MESSAGES = {
+  TOKEN_REQUIRED: 'Необходим токен для доступа',
+  TOKEN_INVALID: 'Неверный или просроченный токен',
+  ROLE_UNDEFINED: 'Доступ запрещён: роль не определена',
+  ADMIN_ONLY: 'Доступ только для администраторов',
+};
+
+function roleRequiredMessage(allowedRoles) {
+  return `Доступ запрещён: требуется роль ${allowedRoles.join(' или ')}`;
+}
+
+/** pull token from Authorization header, or null */
+function extractBearerToken(req) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return null;
+  return auth.split(' ')[1];
+}
+
 exports.protect = (req, res, next) => {
-  let token;
-
-  // 1. Достаём токен из заголовка Authorization
-  if (req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1]; // "Bearer <token>" → <token>
-  }
-
-  // 2. Если токена нет — 401
+  const token = extractBearerToken(req);
   if (!token) {
-    return res.status(401).json({ message: 'Необходим токен для доступа' });
+    return res.status(401).json({ message: MESSAGES.TOKEN_REQUIRED });
   }
 
   try {
-    // 3. Проверяем подпись и срок действия
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // { userId, role, iat, exp }
-
-    // 4. Кладём полезные поля в req.user
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = {
       userId: decoded.userId,
       role: decoded.role,
     };
-
-    console.log('[protect] userId:', req.user.userId, 'role:', req.user.role);
-
     return next();
   } catch (err) {
     console.error('[protect] JWT verify error:', err.message);
-    return res.status(401).json({ message: 'Неверный или просроченный токен' });
+    return res.status(401).json({ message: MESSAGES.TOKEN_INVALID });
   }
 };
 
-/**
- * Ограничение по ролям.
- * Пример: router.post('/admin', protect, checkRole(['admin']), adminController);
- */
 exports.checkRole = (allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !req.user.role) {
-      return res.status(403).json({ message: 'Доступ запрещён: роль не определена' });
+      return res.status(403).json({ message: MESSAGES.ROLE_UNDEFINED });
     }
-
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
-        message: `Доступ запрещён: требуется роль ${allowedRoles.join(' или ')}`,
+        message: roleRequiredMessage(allowedRoles),
       });
     }
-
     return next();
   };
 };
 
-/**
- * Admin-only middleware
- * Shorthand for checkRole(['admin'])
- */
 exports.adminOnly = (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Доступ только для администраторов' });
+    return res.status(403).json({ message: MESSAGES.ADMIN_ONLY });
   }
   return next();
 };

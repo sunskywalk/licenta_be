@@ -1,0 +1,28 @@
+module.exports = {
+  ROLES: {
+    ADMIN: 'admin',
+    TEACHER: 'teacher',
+    STUDENT: 'student',
+  },
+  JWT_EXPIRES: '1d',
+  MESSAGES: {
+    ADMIN_ONLY_CREATE: 'Только admin может создавать пользователей',
+    DUPLICATE_EMAIL: 'Пользователь с таким email уже существует',
+    USER_CREATED: 'Пользователь создан',
+    BAD_CREDENTIALS: 'Неверный email или пароль',
+    LOGIN_OK: 'Успешный вход',
+    FORBIDDEN: 'Нет прав',
+    CREATE_USER_ERROR: 'Ошибка при создании пользователя',
+    LOGIN_ERROR: 'Ошибка при входе',
+    LIST_USERS_ERROR: 'Ошибка при получении пользователей',
+    LIST_ADMINS_ERROR: 'Ошибка при получении администраторов',
+    NOT_FOUND_SHORT: 'Не найден',
+    GENERIC_ERROR: 'Ошибка',
+    USER_NOT_FOUND: 'Пользователь не найден',
+    USER_UPDATED: 'Пользователь обновлён',
+    UPDATE_ERROR: 'Ошибка при обновлении',
+    DELETE_FORBIDDEN: 'Нет прав (только admin)',
+    USER_DELETED: 'Пользователь удалён',
+    DELETE_ERROR: 'Ошибка при удалении',
+  },
+};

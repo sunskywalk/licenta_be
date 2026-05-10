@@ -5,7 +5,7 @@ const {
   getSystemStats,
   getRecentActivity,
   getClassStats
-} = require('../controllers/statsController');
+} = require('../controllers/statsController/index');
 
 // Все маршруты статистики доступны только админам
 router.use(protect);

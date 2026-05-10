@@ -1,7 +1,7 @@
 // routes/academicYearRoutes.js
 const express = require('express');
 const router = express.Router();
-const academicYearController = require('../controllers/academicYearController');
+const academicYearController = require('../controllers/academicYearController/index');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 
 // Все роуты защищены авторизацией
