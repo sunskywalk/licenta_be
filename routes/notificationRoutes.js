@@ -1,7 +1,7 @@
 // routes/notificationRoutes.js
 const express = require('express');
 const router = express.Router();
-const notificationController = require('../controllers/notificationController');
+const notificationController = require('../controllers/notificationController/index');
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/', protect, notificationController.createNotification);

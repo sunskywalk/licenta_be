@@ -1,8 +1,8 @@
 // routes/scheduleRoutes.js
 const express = require('express');
 const router = express.Router();
-const scheduleController = require('../controllers/scheduleController');
-const scheduleImportExport = require('../controllers/scheduleImportExport');
+const scheduleController = require('../controllers/scheduleController/index');
+const scheduleImportExport = require('../controllers/scheduleImportExport/index');
 const { protect, checkRole } = require('../middleware/authMiddleware');
 
 // создать расписание (admin)
