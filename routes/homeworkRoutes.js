@@ -1,7 +1,8 @@
 // routes/homeworkRoutes.js
 const express = require('express');
 const router = express.Router();
-const homeworkController = require('../controllers/homeworkController');
+// Use explicit /index — avoids resolving a same-named file instead of this folder (Node quirk)
+const homeworkController = require('../controllers/homeworkController/index');
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/', protect, homeworkController.createHomework);
