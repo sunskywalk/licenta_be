@@ -1,4 +1,6 @@
 const repository = require('./repository');
+const { defaultAcademicYear } = require('../../utils/academicYearUtils');
+const AcademicYear = require('../../models/AcademicYear/index');
 const validators = require('./validators');
 
 async function assertTeacherSubjectAccess(user, subject) {
@@ -30,6 +32,11 @@ async function assertTeacherGradeAccess(user, gradeId, actionText) {
   return null;
 }
 
+async function resolveActiveAcademicYearValue() {
+  const activeYear = await AcademicYear.getActive();
+  return activeYear?.year ?? defaultAcademicYear();
+}
+
 async function createGrade(data, user) {
   if (!validators.canManageGrades(user.role)) {
     return { status: 403, body: { message: 'Нет прав добавлять оценки' } };
@@ -37,6 +44,8 @@ async function createGrade(data, user) {
 
   const subjectAccessError = await assertTeacherSubjectAccess(user, data.subject);
   if (subjectAccessError) return subjectAccessError;
+
+  const academicYear = data.academicYear ?? await resolveActiveAcademicYearValue();
 
   const newGrade = await repository.createGrade({
     student: data.student,
@@ -47,6 +56,7 @@ async function createGrade(data, user) {
     semester: data.semester,
     value: data.value,
     comment: data.comment,
+    academicYear,
   });
 
   return { status: 201, body: { message: 'Оценка создана', grade: newGrade } };

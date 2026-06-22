@@ -2,17 +2,38 @@ const repository = require('./repository');
 const { isAdmin, isTeacher, isStudent } = require('./validators');
 const { hasId, removeId } = require('./helpers');
 
-async function createClass(name, user) {
+const { parseClassName } = require('../../utils/classNameUtils');
+
+async function createClass(body, user) {
   if (!isAdmin(user)) {
     return { error: true, status: 403, body: { message: 'Только admin может создавать классы' } };
   }
 
+  const { name, grade, students, teachers } = body;
   const existing = await repository.findClassByName(name);
   if (existing) {
     return { error: true, status: 400, body: { message: 'Класс с таким названием уже существует' } };
   }
 
-  const classroom = await repository.createClass({ name });
+  const resolvedGrade = grade ?? parseClassName(name).grade;
+  const classroom = await repository.createClass({
+    name,
+    grade: resolvedGrade,
+    students: students || [],
+    teachers: teachers || [],
+  });
+
+  if (students?.length) {
+    for (const studentId of students) {
+      await repository.removeStudentFromAllClasses(studentId);
+      const student = await repository.findUserById(studentId);
+      if (student) {
+        student.classRooms = [classroom._id];
+        await student.save();
+      }
+    }
+  }
+
   return { status: 201, body: { message: 'Класс создан', classroom } };
 }
 
@@ -26,8 +47,9 @@ async function updateClass(id, body, user) {
     return { error: true, status: 404, body: { message: 'Класс не найден' } };
   }
 
-  const { name, teachers, students } = body;
+  const { name, grade, teachers, students } = body;
   if (name) cls.name = name;
+  if (grade !== undefined) cls.grade = grade;
   if (teachers) cls.teachers = teachers;
   if (students) cls.students = students;
 

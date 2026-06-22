@@ -16,6 +16,7 @@ const {
   buildAttendanceRankingItem,
   findRankPosition,
 } = require('./helpers');
+const { mergeYearFilter } = require('../../utils/academicYearUtils');
 
 async function getAllGrades() {
   return repository.findAllGrades();
@@ -30,7 +31,7 @@ async function getStudentAverage(studentId, query, user) {
     return { status: 403, body: { message: 'Нет прав' } };
   }
 
-  const filter = { student: studentId };
+  const filter = mergeYearFilter({ student: studentId }, query.year);
   if (query.subject) filter.subject = query.subject;
   if (query.semester) filter.semester = Number(query.semester);
 
@@ -51,7 +52,7 @@ async function getFinalAverage(studentId, query, user) {
     return { status: 403, body: { message: 'Нет прав' } };
   }
 
-  const filter = { student: studentId };
+  const filter = mergeYearFilter({ student: studentId }, query.year);
   if (query.subject) filter.subject = query.subject;
 
   const allGrades = await repository.findGradesByFilter(filter);
@@ -72,7 +73,7 @@ async function getFinalAverage(studentId, query, user) {
   };
 }
 
-async function getTeacherGrades(teacherId, user) {
+async function getTeacherGrades(teacherId, user, year) {
   if (!validators.canReadTeacherGrades(user.role)) {
     return { status: 403, body: { message: 'Нет прав - недопустимая роль' } };
   }
@@ -81,16 +82,17 @@ async function getTeacherGrades(teacherId, user) {
     return { status: 403, body: { message: 'Нет прав - учитель может смотреть только свои оценки' } };
   }
 
-  const grades = await repository.findGradesByFilter({ teacher: teacherId });
+  const filter = mergeYearFilter({ teacher: teacherId }, year);
+  const grades = await repository.findGradesByFilter(filter);
   return { status: 200, body: grades };
 }
 
-async function getStudentGrades(studentId, user) {
+async function getStudentGrades(studentId, user, year) {
   if (validators.isStudent(user.role) && !isSameId(user.userId, studentId)) {
     return { status: 403, body: { message: 'Нет прав' } };
   }
 
-  const filter = { student: studentId };
+  const filter = mergeYearFilter({ student: studentId }, year);
 
   if (validators.isTeacher(user.role)) {
     const teacher = await repository.findTeacherById(user.userId);
@@ -117,8 +119,9 @@ async function getStudentGrades(studentId, user) {
   return { status: 200, body: grades };
 }
 
-async function getGradesByClass(classId) {
-  const grades = await repository.findGradesByFilter({ classId });
+async function getGradesByClass(classId, year) {
+  const filter = mergeYearFilter({ classId }, year);
+  const grades = await repository.findGradesByFilter(filter);
   return { status: 200, body: grades };
 }
 
@@ -241,12 +244,7 @@ async function getStudentGradeStats(studentId, year, user) {
     };
   }
 
-  const filter = { student: studentId };
-  if (year) {
-    const yearInt = parseInt(year, 10);
-    filter.$or = [{ academicYear: yearInt }, { academicYear: { $exists: false } }, { academicYear: null }];
-  }
-
+  const filter = mergeYearFilter({ student: studentId }, year);
   const scopedFilter = await resolveTeacherScopedFilter(filter, studentId, user);
   if (!scopedFilter) {
     return { status: 200, body: cloneEmptyGradeStats() };
@@ -271,10 +269,12 @@ async function getStudentGradeStats(studentId, year, user) {
 
   const classGradeRanking = (await Promise.all(
     classmates.map(async (classmate) => {
-      const classmateGrades = await repository.findGradesByFilterRaw({
-        student: classmate._id,
-        type: { $ne: FINAL_GRADE_TYPE },
-      });
+      const classmateGrades = await repository.findGradesByFilterRaw(
+        mergeYearFilter({
+          student: classmate._id,
+          type: { $ne: FINAL_GRADE_TYPE },
+        }, year)
+      );
       if (!classmateGrades.length) return null;
 
       const classmateAverage = calculateAverage(classmateGrades, (grade) => grade.value);
@@ -312,8 +312,13 @@ async function getStudentGradeStats(studentId, year, user) {
   };
 }
 
-async function getStudentSubjectStats(studentId, subject) {
-  const grades = await repository.findGradesByFilterRaw({ student: studentId, subject }).sort({ createdAt: -1 });
+async function getStudentSubjectStats(studentId, subject, year, user) {
+  if (validators.isStudent(user.role) && !isSameId(user.userId, studentId)) {
+    return { status: 403, body: { message: 'Нет прав' } };
+  }
+
+  const filter = mergeYearFilter({ student: studentId, subject }, year);
+  const grades = await repository.findGradesByFilterRaw(filter).sort({ createdAt: -1 });
 
   if (!grades.length) {
     return { status: 200, body: cloneEmptySubjectStats(subject) };
@@ -331,11 +336,13 @@ async function getStudentSubjectStats(studentId, subject) {
 
   const classSubjectRanking = (await Promise.all(
     classmates.map(async (classmate) => {
-      const classmateGrades = await repository.findGradesByFilterRaw({
-        student: classmate._id,
-        subject,
-        type: { $ne: FINAL_GRADE_TYPE },
-      });
+      const classmateGrades = await repository.findGradesByFilterRaw(
+        mergeYearFilter({
+          student: classmate._id,
+          subject,
+          type: { $ne: FINAL_GRADE_TYPE },
+        }, year)
+      );
       if (!classmateGrades.length) return null;
 
       const classmateAverage = calculateAverage(classmateGrades, (grade) => grade.value);

@@ -6,6 +6,12 @@ const classroomSchema = new mongoose.Schema({
     required: [true, 'Название класса (например, 5A) обязательно'],
     unique: true,
   },
+  grade: {
+    type: Number,
+    min: 5,
+    max: 12,
+    default: null,
+  },
   teachers: [
     {
       type: mongoose.Schema.Types.ObjectId,

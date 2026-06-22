@@ -35,6 +35,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/stats', require('./routes/statsRoutes'));
 app.use('/api/school-events', require('./routes/schoolEventRoutes'));
 app.use('/api/academic-years', require('./routes/academicYearRoutes'));
+app.use('/api/year-transition', require('./routes/yearTransitionRoutes'));
 
 const PORT = process.env.PORT || 3000;
 

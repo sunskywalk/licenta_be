@@ -20,7 +20,9 @@ async function getClassById(id) {
   return repository.findClassByIdPopulated(id);
 }
 
-async function getClassWithStats(id, user) {
+const { mergeYearFilter } = require('../../utils/academicYearUtils');
+
+async function getClassWithStats(id, user, year) {
   const cls = await repository.findClassByIdPopulated(id);
   if (!cls) {
     return { error: true, status: 404, body: { message: 'Класс не найден' } };
@@ -47,7 +49,8 @@ async function getClassWithStats(id, user) {
   const thirtyDaysAgo = getThirtyDaysAgo();
 
   for (const student of cls.students) {
-    const grades = await repository.findGradesByStudent(student._id);
+    const gradeFilter = mergeYearFilter({ student: student._id }, year);
+    const grades = await repository.findGradesByStudentFiltered(gradeFilter);
     const attendanceRecords = await repository.findAttendanceByStudentSince(student._id, thirtyDaysAgo);
     const studentData = buildStudentStats(student, grades, attendanceRecords);
 

@@ -6,7 +6,7 @@ function sendResult(res, result) {
 
 async function createClass(req, res) {
   try {
-    const result = await service.createClass(req.body.name, req.user);
+    const result = await service.createClass(req.body, req.user);
     return sendResult(res, result);
   } catch (error) {
     return res.status(500).json({ message: 'Ошибка при создании класса', error: error.message });
@@ -64,7 +64,7 @@ async function assignHomeroomTeacher(req, res) {
 
 async function getClassWithStats(req, res) {
   try {
-    const result = await service.getClassWithStats(req.params.id, req.user);
+    const result = await service.getClassWithStats(req.params.id, req.user, req.query.year);
     return sendResult(res, result);
   } catch (error) {
     console.error('[getClassWithStats]', error);

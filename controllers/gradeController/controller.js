@@ -72,7 +72,7 @@ async function getFinalAverage(req, res) {
 
 async function getTeacherGrades(req, res) {
   try {
-    const result = await service.getTeacherGrades(req.params.teacherId, req.user);
+    const result = await service.getTeacherGrades(req.params.teacherId, req.user, req.query.year);
     return sendResult(res, result);
   } catch (error) {
     console.error('Error in getTeacherGrades:', error);
@@ -82,7 +82,7 @@ async function getTeacherGrades(req, res) {
 
 async function getStudentGrades(req, res) {
   try {
-    const result = await service.getStudentGrades(req.params.studentId, req.user);
+    const result = await service.getStudentGrades(req.params.studentId, req.user, req.query.year);
     return sendResult(res, result);
   } catch (error) {
     console.error('Error in getStudentGrades:', error);
@@ -92,7 +92,7 @@ async function getStudentGrades(req, res) {
 
 async function getGradesByClass(req, res) {
   try {
-    const result = await service.getGradesByClass(req.params.classId);
+    const result = await service.getGradesByClass(req.params.classId, req.query.year);
     return sendResult(res, result);
   } catch (error) {
     console.error('Error in getGradesByClass:', error);
@@ -152,7 +152,12 @@ async function getStudentGradeStats(req, res) {
 
 async function getStudentSubjectStats(req, res) {
   try {
-    const result = await service.getStudentSubjectStats(req.params.studentId, req.params.subject);
+    const result = await service.getStudentSubjectStats(
+      req.params.studentId,
+      req.params.subject,
+      req.query.year,
+      req.user
+    );
     return sendResult(res, result);
   } catch (error) {
     console.error('Error fetching subject stats:', error);

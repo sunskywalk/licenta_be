@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
       ref: 'Classroom',
     },
   ],
+  graduationYear: {
+    type: Number,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

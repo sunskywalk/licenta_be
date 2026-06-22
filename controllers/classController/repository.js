@@ -84,6 +84,10 @@ function findGradesByStudent(studentId) {
   return Grade.find({ student: studentId }).populate('teacher', POPULATE_SELECT.NAME_ONLY);
 }
 
+function findGradesByStudentFiltered(filter) {
+  return Grade.find(filter).populate('teacher', POPULATE_SELECT.NAME_ONLY);
+}
+
 function findAttendanceByStudentSince(studentId, sinceDate) {
   return Attendance.find({
     student: studentId,
@@ -106,5 +110,6 @@ module.exports = {
   findClassesByIds,
   removeStudentFromAllClasses,
   findGradesByStudent,
+  findGradesByStudentFiltered,
   findAttendanceByStudentSince,
 };
