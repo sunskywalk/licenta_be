@@ -35,6 +35,7 @@ async function getStudentLessonDetails(studentId, subject, dateStr) {
             description: hw.description || '',
             dueDate: hw.dueDate,
             createdAt: hw.createdAt,
+            attachments: hw.attachments || [],
         })),
         teacherComment: recentGradeWithComment?.comment || null,
         lastCommentDate: recentGradeWithComment?.createdAt || null,

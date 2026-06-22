@@ -54,11 +54,19 @@ function findGradesByFilterRaw(filter) {
 }
 
 function countTeacherGradesBySubject(teacherId, subject) {
-  return Grade.countDocuments({ teacher: teacherId, subject });
+  const escaped = String(subject).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Grade.countDocuments({
+    teacher: teacherId,
+    subject: { $regex: new RegExp(`^${escaped}$`, 'i') },
+  });
 }
 
 function findDistinctTeacherClassIdsBySubject(teacherId, subject) {
-  return Grade.distinct('classId', { teacher: teacherId, subject });
+  const escaped = String(subject).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Grade.distinct('classId', {
+    teacher: teacherId,
+    subject: { $regex: new RegExp(`^${escaped}$`, 'i') },
+  });
 }
 
 function findClassroomsByIds(classIds) {

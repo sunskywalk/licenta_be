@@ -1,7 +1,7 @@
 const repository = require('./repository');
 const { normalizeAssignedTo } = require('./helpers');
 
-function buildCreatePayload(body, teacherUserId) {
+function buildCreatePayload(body, teacherUserId, attachments = []) {
     const { classId, subject, title, description, dueDate, assignedTo } = body;
     return {
         classId,
@@ -11,6 +11,7 @@ function buildCreatePayload(body, teacherUserId) {
         description,
         dueDate,
         assignedTo: normalizeAssignedTo(assignedTo),
+        attachments,
     };
 }
 
@@ -19,8 +20,8 @@ function buildUpdatePayload(body) {
     return { classId, subject, title, description, dueDate, assignedTo };
 }
 
-async function createHomework(body, teacherUserId) {
-    const payload = buildCreatePayload(body, teacherUserId);
+async function createHomework(body, teacherUserId, attachments = []) {
+    const payload = buildCreatePayload(body, teacherUserId, attachments);
     return repository.createHomework(payload);
 }
 

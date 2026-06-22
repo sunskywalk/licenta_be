@@ -8,6 +8,7 @@ console.log('[DEBUG] dotenv loaded');
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const connectDB = require('./config/db');             // ДОЛЖНА возвращать Promise!
 
 console.log('[DEBUG] libs imported');
@@ -17,6 +18,7 @@ console.log("Loading routes"); const app = express();
 // ────────────────────── Middleware ──────────────────────
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 console.log('[DEBUG] middleware registered');
 
 // ────────────────────── Test-маршрут ────────────────────

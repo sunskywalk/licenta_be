@@ -1,5 +1,6 @@
 const service = require('./service');
 const { isEndDateAfterStartDate, isValidPresetType } = require('./validators');
+const { clearCachedAcademicYear } = require('../../config/academicConfig/cacheStore');
 
 async function createAcademicYear(req, res) {
     try {
@@ -13,6 +14,9 @@ async function createAcademicYear(req, res) {
 
         const payload = service.buildCreatePayload(req.body, req.user.userId);
         const academicYear = await service.repository.createAcademicYear(payload);
+        if (academicYear.isActive) {
+            clearCachedAcademicYear();
+        }
 
         res.status(201).json({
             message: 'Учебный год создан',
@@ -79,6 +83,7 @@ async function updateAcademicYear(req, res) {
 
         service.applyAcademicYearUpdates(academicYear, req.body);
         await academicYear.save();
+        clearCachedAcademicYear();
 
         res.json({
             message: 'Учебный год обновлён',
@@ -131,6 +136,7 @@ async function applyPreset(req, res) {
         academicYear.systemType = presetType;
         academicYear.periods = periods;
         await academicYear.save();
+        clearCachedAcademicYear();
 
         res.json({
             message: `Применён пресет: ${presetType}`,

@@ -30,6 +30,13 @@ const homeworkSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  attachments: [{
+    originalName: { type: String, required: true },
+    storedName: { type: String, required: true },
+    mimeType: { type: String, default: 'application/octet-stream' },
+    size: { type: Number, default: 0 },
+    url: { type: String, required: true },
+  }],
 }, {
   timestamps: true,
 });

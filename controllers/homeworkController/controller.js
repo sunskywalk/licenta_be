@@ -1,5 +1,6 @@
 const service = require('./service');
 const { MESSAGES, ROLES } = require('./constants');
+const { mapUploadedFiles } = require('../../middleware/homeworkUpload');
 const {
     canManageHomework,
     studentMayViewTargetStudent,
@@ -17,12 +18,17 @@ async function createHomework(req, res) {
         }
 
         const { classId, subject, title, description, dueDate, assignedTo } = req.body;
+        const attachments = mapUploadedFiles(req.files);
         const hw = await service.createHomework(
             { classId, subject, title, description, dueDate, assignedTo },
-            req.user.userId
+            req.user.userId,
+            attachments
         );
         res.status(201).json({ message: MESSAGES.CREATED, homework: hw });
     } catch (error) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'Файл слишком большой (максимум 10 МБ)' });
+        }
         res.status(500).json({ message: MESSAGES.SERVER_ERROR, error: error.message });
     }
 }

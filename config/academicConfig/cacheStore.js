@@ -14,8 +14,14 @@ function setCachedAcademicYear(academicYear, timestamp) {
     cacheTimestamp = timestamp;
 }
 
+function clearCachedAcademicYear() {
+    cachedAcademicYear = null;
+    cacheTimestamp = 0;
+}
+
 module.exports = {
     getCachedAcademicYear,
     getCacheTimestamp,
     setCachedAcademicYear,
+    clearCachedAcademicYear,
 };
