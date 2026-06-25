@@ -16,6 +16,7 @@ const EMPTY_GRADE_STATS = {
   classRankByGrades: null,
   classRankByAttendance: null,
   attendanceRate: 0,
+  totalClassmates: 0,
 };
 
 const EMPTY_SUBJECT_STATS = {
@@ -25,6 +26,7 @@ const EMPTY_SUBJECT_STATS = {
   attendanceRate: 0,
   classRankByGrades: null,
   classRankByAttendance: null,
+  totalClassmates: 0,
 };
 
 module.exports = {

@@ -56,6 +56,7 @@ function mapUploadedFiles(files = []) {
 module.exports = {
   homeworkUploadMiddleware: upload.array('attachments', MAX_FILES),
   mapUploadedFiles,
+  fileFilter,
   UPLOAD_DIR,
   MAX_FILE_SIZE,
   MAX_FILES,

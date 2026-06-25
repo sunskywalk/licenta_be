@@ -55,7 +55,7 @@ async function listClassesForTemplate() {
 }
 
 async function listTeachersForTemplate() {
-    return User.find({ role: ROLE_TEACHER }).select('name email _id').sort({ name: 1 });
+    return User.find({ role: ROLE_TEACHER }).select('name email _id subjects').sort({ name: 1 });
 }
 
 module.exports = {

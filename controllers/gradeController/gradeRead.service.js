@@ -3,6 +3,7 @@ const validators = require('./validators');
 const { ROLES, FINAL_GRADE_TYPE } = require('./constants');
 const {
   isSameId,
+  subjectsMatch,
   calculateAverage,
   withTwoDecimals,
   buildSubjectStatsMap,
@@ -168,7 +169,7 @@ async function getClassroomsForSubject(subject, user) {
   const teacherId = user.userId;
   const classIds = await repository.findDistinctTeacherClassIdsBySubject(teacherId, subject);
   const classrooms = await repository.findClassroomsByIds(classIds);
-  const classroomsWithFlags = buildClassroomFlags(classrooms, teacherId);
+  const classroomsWithFlags = buildClassroomFlags(classrooms, teacherId, { teachesSubject: true });
   const homeroomClass = await repository.findHomeroomClassByTeacher(teacherId);
 
   return {
@@ -236,6 +237,45 @@ async function resolveTeacherScopedFilter(baseFilter, studentId, user) {
   return filter;
 }
 
+async function enrichSubjectStatsWithSchedule(studentId, subjectStats, user) {
+  const student = await repository.findStudentById(studentId);
+  if (!student?.classRooms?.length) {
+    return subjectStats;
+  }
+
+  const classId = student.classRooms[0];
+  const scheduleSubjects = await repository.findDistinctSubjectsByClassId(classId);
+  let subjectsToAdd = scheduleSubjects;
+
+  if (validators.isTeacher(user.role)) {
+    const teacher = await repository.findTeacherById(user.userId);
+    const classroom = await repository.findClassroomById(classId);
+    const isHomeroom = classroom && isSameId(classroom.homeroomTeacher, user.userId);
+
+    if (isHomeroom && teacher?.subjects?.length) {
+      subjectsToAdd = [...new Set([...scheduleSubjects, ...teacher.subjects])];
+    } else if (!isHomeroom && teacher?.subjects?.length) {
+      subjectsToAdd = scheduleSubjects.filter((scheduleSubject) =>
+        teacher.subjects.some((teacherSubject) => subjectsMatch(scheduleSubject, teacherSubject))
+      );
+    }
+  }
+
+  const nextStats = { ...subjectStats };
+  subjectsToAdd.forEach((subject) => {
+    if (!nextStats[subject]) {
+      nextStats[subject] = {
+        grades: [],
+        total: 0,
+        count: 0,
+        finalGrades: {},
+      };
+    }
+  });
+
+  return nextStats;
+}
+
 async function getStudentGradeStats(studentId, year, user) {
   if (validators.isStudent(user.role) && !isSameId(user.userId, studentId)) {
     return {
@@ -246,17 +286,15 @@ async function getStudentGradeStats(studentId, year, user) {
 
   const filter = mergeYearFilter({ student: studentId }, year);
   const scopedFilter = await resolveTeacherScopedFilter(filter, studentId, user);
+  const classmates = await resolveClassmates(studentId);
+
   if (!scopedFilter) {
-    return { status: 200, body: cloneEmptyGradeStats() };
+    return { status: 200, body: { ...cloneEmptyGradeStats(), totalClassmates: classmates.length } };
   }
 
   const studentGrades = await repository.findGradesByFilterRaw(scopedFilter);
-  if (studentGrades.length === 0) {
-    return { status: 200, body: cloneEmptyGradeStats() };
-  }
-
-  const classmates = await resolveClassmates(studentId);
-  const subjectStats = buildSubjectStatsMap(studentGrades);
+  let subjectStats = buildSubjectStatsMap(studentGrades);
+  subjectStats = await enrichSubjectStatsWithSchedule(studentId, subjectStats, user);
   const subjects = mapSubjectStatsToResponse(subjectStats);
 
   const regularGrades = studentGrades.filter((grade) => grade.type !== FINAL_GRADE_TYPE);
@@ -321,7 +359,11 @@ async function getStudentSubjectStats(studentId, subject, year, user) {
   const grades = await repository.findGradesByFilterRaw(filter).sort({ createdAt: -1 });
 
   if (!grades.length) {
-    return { status: 200, body: cloneEmptySubjectStats(subject) };
+    const classmates = await resolveClassmates(studentId);
+    return {
+      status: 200,
+      body: { ...cloneEmptySubjectStats(subject), totalClassmates: classmates.length },
+    };
   }
 
   const classmates = await resolveClassmates(studentId);

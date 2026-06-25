@@ -6,7 +6,37 @@ const {
 } = require('./constants');
 
 function toObjectIdString(value) {
+  if (value == null) return '';
+  if (typeof value === 'object' && value._id != null) {
+    return String(value._id);
+  }
   return String(value);
+}
+
+function normalizeSubjectName(subject) {
+  return String(subject || '').toLowerCase().trim();
+}
+
+const SUBJECT_ALIAS_GROUPS = [
+  ['tic', 'ict', 'informatică', 'informatica', 'computer science', 'computer_science'],
+  ['romanian', 'limba română', 'limba romana'],
+  ['english', 'limba engleză', 'limba engleza', 'engleză', 'engleza'],
+  ['mathematics', 'matematică', 'matematica'],
+  ['history', 'istorie'],
+  ['geography', 'geografie'],
+  ['art', 'educație plastică', 'educatie plastica'],
+  ['music', 'educație muzicală', 'educatie muzicala'],
+];
+
+function subjectsMatch(left, right) {
+  const a = normalizeSubjectName(left);
+  const b = normalizeSubjectName(right);
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  return SUBJECT_ALIAS_GROUPS.some(
+    (group) => group.includes(a) && group.includes(b)
+  );
 }
 
 function isSameId(left, right) {
@@ -34,12 +64,12 @@ function buildSubjectStatsMap(grades) {
         grades: [],
         total: 0,
         count: 0,
-        finalGrade: null,
+        finalGrades: {},
       };
     }
 
     if (grade.type === FINAL_GRADE_TYPE) {
-      acc[grade.subject].finalGrade = grade.value;
+      acc[grade.subject].finalGrades[grade.semester] = grade.value;
     } else {
       acc[grade.subject].grades.push(grade.value);
       acc[grade.subject].total += grade.value;
@@ -50,13 +80,25 @@ function buildSubjectStatsMap(grades) {
   }, {});
 }
 
+function resolveLatestFinalGrade(subjectEntry) {
+  if (subjectEntry.finalGrades && Object.keys(subjectEntry.finalGrades).length > 0) {
+    const semesters = Object.keys(subjectEntry.finalGrades)
+      .map(Number)
+      .sort((left, right) => right - left);
+    return subjectEntry.finalGrades[semesters[0]];
+  }
+
+  return subjectEntry.finalGrade ?? null;
+}
+
 function mapSubjectStatsToResponse(subjectStats) {
   return Object.keys(subjectStats).map((subject) => ({
     name: subject,
     averageGrade: subjectStats[subject].count > 0
       ? withOneDecimal(subjectStats[subject].total / subjectStats[subject].count)
       : 0,
-    finalGrade: subjectStats[subject].finalGrade || null,
+    finalGrade: resolveLatestFinalGrade(subjectStats[subject]),
+    finalGrades: subjectStats[subject].finalGrades || {},
     totalGrades: subjectStats[subject].count,
   }));
 }
@@ -75,12 +117,15 @@ function cloneEmptySubjectStats(subject) {
   return { subject, ...EMPTY_SUBJECT_STATS, grades: [] };
 }
 
-function buildClassroomFlags(classrooms, teacherId) {
+function buildClassroomFlags(classrooms, teacherId, options = {}) {
+  const { teachesSubject = false } = options;
+
   return classrooms.map((classroom) => {
     const classroomObj = classroom.toObject();
     classroomObj.isHomeroom = Boolean(
       classroom.homeroomTeacher && isSameId(classroom.homeroomTeacher._id, teacherId)
     );
+    classroomObj.teachesSubjectHere = teachesSubject;
     return classroomObj;
   });
 }
@@ -88,11 +133,23 @@ function buildClassroomFlags(classrooms, teacherId) {
 function appendHomeroomClassIfMissing(classrooms, list, homeroomClass, includeHomeroomOnlyFlag) {
   if (!homeroomClass) return list;
 
-  const existsInList = classrooms.some((item) => isSameId(item._id, homeroomClass._id));
-  if (existsInList) return list;
+  const homeroomId = toObjectIdString(homeroomClass._id);
+  const existingIndex = list.findIndex((item) => isSameId(item._id, homeroomId));
+
+  if (existingIndex >= 0) {
+    list[existingIndex].isHomeroom = true;
+    if (list[existingIndex].teachesSubjectHere) {
+      list[existingIndex].isHomeroomOnly = false;
+    }
+    return list;
+  }
+
+  const existsInSource = classrooms.some((item) => isSameId(item._id, homeroomId));
+  if (existsInSource) return list;
 
   const homeroomObj = homeroomClass.toObject();
   homeroomObj.isHomeroom = true;
+  homeroomObj.teachesSubjectHere = false;
   if (includeHomeroomOnlyFlag) {
     homeroomObj.isHomeroomOnly = true;
   }
@@ -121,6 +178,8 @@ function findRankPosition(items, studentId) {
 
 module.exports = {
   isSameId,
+  subjectsMatch,
+  normalizeSubjectName,
   calculateAverage,
   withTwoDecimals,
   buildSubjectStatsMap,

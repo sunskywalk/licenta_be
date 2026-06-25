@@ -4,6 +4,30 @@ const {
     buildEmptyExportPayload,
     buildExportPayload,
 } = require('./helpers');
+const {
+    buildWorkbook,
+    workbookToBuffer,
+    buildExcelFilename,
+} = require('./excelHelpers');
+
+const DEFAULT_SUBJECTS = [
+    'Matematica',
+    'Limba română',
+    'Engleză',
+    'Franceză',
+    'Istorie',
+    'Geografie',
+    'Fizică',
+    'Chimie',
+    'Biologie',
+    'Educație fizică',
+    'Educație plastică',
+    'Educație muzicală',
+    'Educație civică',
+    'Educație religioasă',
+    'TIC',
+    'Tehnologii',
+];
 
 function buildMongoQuery(classId, semester) {
     const query = {};
@@ -108,7 +132,87 @@ async function getImportTemplate() {
     };
 }
 
+async function buildExcelExportPayload(classId, semester, week) {
+    const query = buildMongoQuery(classId, semester);
+    let schedules = await repo.findSchedulesWithWeekFilter(
+        query,
+        week ? parseInt(week, 10) : undefined
+    );
+
+    if (schedules.length === 0 && week) {
+        schedules = await repo.findSchedulesWithoutWeek(query);
+    }
+
+    const [classes, teachers] = await Promise.all([
+        repo.listClassesForTemplate(),
+        repo.listTeachersForTemplate(),
+    ]);
+
+    const workbook = buildWorkbook({
+        schedules,
+        classes,
+        teachers,
+        subjects: DEFAULT_SUBJECTS,
+    });
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const label = classId === 'all' ? 'all' : schedules[0]?.classId?.name || classId;
+    const filename = buildExcelFilename('schedule_export', label, dateStr);
+
+    return {
+        buffer: workbookToBuffer(workbook),
+        filename,
+        totalSchedules: schedules.length,
+    };
+}
+
+async function exportScheduleExcel(req) {
+    const { classId } = req.params;
+    const { semester, week } = req.query;
+    const payload = await buildExcelExportPayload(classId, semester, week);
+
+    return {
+        status: 200,
+        buffer: payload.buffer,
+        filename: payload.filename,
+        headers: {
+            'Content-Disposition': `attachment; filename="${payload.filename}"`,
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        meta: { totalSchedules: payload.totalSchedules },
+    };
+}
+
+async function getExcelTemplate() {
+    const [classes, teachers] = await Promise.all([
+        repo.listClassesForTemplate(),
+        repo.listTeachersForTemplate(),
+    ]);
+
+    const workbook = buildWorkbook({
+        schedules: [],
+        classes,
+        teachers,
+        subjects: DEFAULT_SUBJECTS,
+    });
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = buildExcelFilename('schedule_template', 'all', dateStr);
+
+    return {
+        status: 200,
+        buffer: workbookToBuffer(workbook),
+        filename,
+        headers: {
+            'Content-Disposition': `attachment; filename="${filename}"`,
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+    };
+}
+
 module.exports = {
     exportSchedule,
     getImportTemplate,
+    exportScheduleExcel,
+    getExcelTemplate,
 };

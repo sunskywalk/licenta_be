@@ -4,6 +4,7 @@ const Attendance = require('../../models/Attendance');
 const Classroom = require('../../models/Classroom');
 const Schedule = require('../../models/Schedule');
 const { POPULATE_FIELDS, PASSWORD_FIELD } = require('./constants');
+const { isSameId, subjectsMatch } = require('./helpers');
 
 function populateGradeQuery(query) {
   let populated = query;
@@ -53,20 +54,55 @@ function findGradesByFilterRaw(filter) {
   return Grade.find(filter);
 }
 
-function countTeacherGradesBySubject(teacherId, subject) {
+function subjectRegex(subject) {
   const escaped = String(subject).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped}$`, 'i');
+}
+
+function countTeacherGradesBySubject(teacherId, subject) {
   return Grade.countDocuments({
     teacher: teacherId,
-    subject: { $regex: new RegExp(`^${escaped}$`, 'i') },
+    subject: { $regex: subjectRegex(subject) },
   });
 }
 
-function findDistinctTeacherClassIdsBySubject(teacherId, subject) {
-  const escaped = String(subject).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return Grade.distinct('classId', {
+async function findDistinctTeacherClassIdsBySubject(teacherId, subject) {
+  const regex = subjectRegex(subject);
+
+  const gradeClassIds = await Grade.distinct('classId', {
     teacher: teacherId,
-    subject: { $regex: new RegExp(`^${escaped}$`, 'i') },
+    subject: { $regex: regex },
   });
+
+  const schedules = await Schedule.find({ 'periods.teacherId': teacherId }).select('classId periods');
+  const scheduleClassIds = schedules
+    .filter((schedule) =>
+      schedule.periods?.some(
+        (period) => period.subject && subjectsMatch(period.subject, subject)
+      )
+    )
+    .map((schedule) => schedule.classId)
+    .filter(Boolean);
+
+  return [...new Set([
+    ...gradeClassIds.map(String),
+    ...scheduleClassIds.map(String),
+  ])];
+}
+
+async function findDistinctSubjectsByClassId(classId) {
+  const schedules = await Schedule.find({ classId });
+  const subjects = new Set();
+
+  schedules.forEach((schedule) => {
+    schedule.periods?.forEach((period) => {
+      if (period.subject) {
+        subjects.add(period.subject);
+      }
+    });
+  });
+
+  return Array.from(subjects);
 }
 
 function findClassroomsByIds(classIds) {
@@ -112,6 +148,7 @@ module.exports = {
   findGradesByFilterRaw,
   countTeacherGradesBySubject,
   findDistinctTeacherClassIdsBySubject,
+  findDistinctSubjectsByClassId,
   findClassroomsByIds,
   findHomeroomClassByTeacher,
   findAllSchedulesWithClass,

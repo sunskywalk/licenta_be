@@ -2,6 +2,7 @@ const User = require('../../models/User');
 const Classroom = require('../../models/Classroom');
 const Attendance = require('../../models/Attendance');
 const Notification = require('../../models/Notification');
+const Grade = require('../../models/Grade');
 const { FETCH_LIMITS, ATTENDANCE_STATUS } = require('./constants');
 
 async function countTotalUsers() {
@@ -18,6 +19,34 @@ async function countClassrooms() {
 
 async function countNotifications() {
     return Notification.countDocuments();
+}
+
+async function countGrades() {
+    return Grade.countDocuments({ type: { $ne: 'final' } });
+}
+
+async function aggregateAttendanceTrend(days = 7) {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - (days - 1));
+
+    return Attendance.aggregate([
+        { $match: { date: { $gte: since } } },
+        {
+            $group: {
+                _id: {
+                    $dateToString: { format: '%Y-%m-%d', date: '$date' },
+                },
+                total: { $sum: 1 },
+                present: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', ATTENDANCE_STATUS.PRESENT] }, 1, 0],
+                    },
+                },
+            },
+        },
+        { $sort: { _id: 1 } },
+    ]);
 }
 
 async function aggregateAttendancePresentTotals() {
@@ -123,6 +152,8 @@ module.exports = {
     countUsersWithRole,
     countClassrooms,
     countNotifications,
+    countGrades,
+    aggregateAttendanceTrend,
     aggregateAttendancePresentTotals,
     findRecentNotificationsDesc,
     findRecentUsersDesc,

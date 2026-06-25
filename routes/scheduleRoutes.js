@@ -3,6 +3,7 @@ const router = express.Router();
 const scheduleController = require('../controllers/scheduleController/index');
 const scheduleImportExport = require('../controllers/scheduleImportExport/index');
 const { protect, checkRole } = require('../middleware/authMiddleware');
+const { scheduleExcelUploadMiddleware } = require('../middleware/scheduleExcelUpload');
 
 router.post('/', protect, checkRole(['admin']), scheduleController.createSchedule);
 router.get('/', protect, scheduleController.getAllSchedules);
@@ -16,8 +17,18 @@ router.get('/with-events/:userId/:date', protect, scheduleController.getSchedule
 
 // import/export before /:id — otherwise "export" is parsed as :id
 router.get('/export-template', protect, checkRole(['admin']), scheduleImportExport.getImportTemplate);
+router.get('/export-template-excel', protect, checkRole(['admin']), scheduleImportExport.getExcelTemplate);
+router.get('/audit-conflicts', protect, checkRole(['admin']), scheduleImportExport.auditConflicts);
 router.get('/export/:classId', protect, checkRole(['admin', 'teacher']), scheduleImportExport.exportSchedule);
+router.get('/export-excel/:classId', protect, checkRole(['admin', 'teacher']), scheduleImportExport.exportScheduleExcel);
 router.post('/import', protect, checkRole(['admin']), scheduleImportExport.importSchedule);
+router.post(
+    '/import-excel',
+    protect,
+    checkRole(['admin']),
+    scheduleExcelUploadMiddleware,
+    scheduleImportExport.importScheduleExcel
+);
 
 router.get('/:id', protect, scheduleController.getScheduleById);
 router.put('/:id', protect, checkRole(['admin']), scheduleController.updateSchedule);

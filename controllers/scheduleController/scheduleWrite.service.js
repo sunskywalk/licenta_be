@@ -119,4 +119,5 @@ module.exports = {
     createSchedule,
     updateSchedule,
     deleteSchedule,
+    computeScheduleConflicts,
 };
